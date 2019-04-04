@@ -14,9 +14,14 @@ Group Members:
    - Product backlog will contain an overview of what the product's functionalities are, and will be a place to discuss and plan our sprints around.
    - Tasks for each sprint will be defined in sprint boards, on Trello.
    - Large tasks will be broken down into smaller pieces/tasks.
-   - Scrummaster - helps make sure we are following defined practices and members are doing their jobs.
+   - Scrummaster helps to make sure we are following defined practices and responsabilities. Our Scrum Master will be Elsada Lagumdzic
    - Daily standups on slack, and if we are having physical meetings, then stand up in a meeting. Weekends not included.
    - Everybody should be present in Planning and Retrospective as they are important to the collaboration. Team should be notified with at least one day in advance if unable to attend important meetings/reviews.
+   - As we have planned to keep the car at school, most of our hands-on testing will take place in school. Development can be done both 
+    at school in a group and individually at home. 
+   - Deploying the code on the car will be done during team meetings where the car will be  shared according to equal time slots, 
+     depending on the length of meeting. 
+        - We will try to be flexible around this.
    ---
 - Kanban Practices to be used:
    - Boards on Trello will represent sprints and each task as cards.
@@ -45,7 +50,7 @@ Group Members:
 
 ### How will we resolve conflicts?
 
-- Talk about it as soon as possible - do not wait.
-- Sprint retrospectives can be a good possibility to discuss about conflicts (for example, why a person is not doing their task
+- Sprint retrospectives can be a good possibility to bring out issues and discuss about problems
+- If the conflict arises the whole team should talk about, preferably in person, as soon as possible - do not wait.
 - Make compromises to satisfy both parties
-- If compromises don't work, ask for TA help.
+- If conflict is not solved, book official conflict resolution meeting with TA as a moderator
