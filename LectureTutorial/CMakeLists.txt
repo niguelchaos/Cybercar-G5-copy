@@ -7,15 +7,6 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Werror -Wno-error=maybe-u
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
-# THIS STUFF ONLY FOR OPENCV
-# get_filename_component(Cyberphysical_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../" ABSOLUTE)
-# set(OpenCV_DIR  ${Cyberphysical_DIR}/opencv-4.0.1)
-
-# message("Cyberphysical_DIR = ${Cyberphysical_DIR}")
-# message("OpenCV_DIR = ${OpenCV_DIR}")
-
-# find_package(OpenCV REQUIRED)
-
 # Extract cluon-msc.
 add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/cluon-msc
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
@@ -28,12 +19,9 @@ add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/messages.hpp
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     COMMAND ${CMAKE_BINARY_DIR}/cluon-msc --cpp --out=${CMAKE_BINARY_DIR}/messages.hpp ${CMAKE_CURRENT_SOURCE_DIR}/messages.odvd
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/messages.odvd ${CMAKE_BINARY_DIR}/cluon-msc)
+
 # Add current build directory as include directory as it contains generated files.
 include_directories(SYSTEM ${CMAKE_BINARY_DIR})
-
-# OPENCV STUFF
-# INCLUDE_DIRECTORIES(../../${CMAKE_CURRENT_SOURCE_DIR})
-# include_directories(${OpenCV_INCLUDE_DIRS})
 
 # messages.hpp also needs to be included in the exec as well
 # Create actual helloworld executable
@@ -47,4 +35,3 @@ add_executable(${PROJECT_NAME}-Runner TestPrimeChecker.cpp ${CMAKE_CURRENT_SOURC
 ${CMAKE_BINARY_DIR}/messages.hpp)
 target_link_libraries(${PROJECT_NAME}-Runner Threads::Threads)
 add_test(NAME ${PROJECT_NAME}-Runner COMMAND ${PROJECT_NAME}-Runner)
-# target_link_libraries(${PROJECT_NAME} ${LIBRARIES} rt ${OpenCV_LIBS})
