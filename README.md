@@ -1,5 +1,4 @@
-# group_05
+# Cybercar G5
 
-### this is nigel speaking can I just ask if we can use our non-chalmers gitlab accounts
-
-#### also our repo needs a better name
+##### This repository contains the source code for navigating a Kiwi car through an intersection.
+We aim to give this car some personality. And collision detection solely for the purpose of deliberately crashing into other cars.
