@@ -75,11 +75,16 @@ int32_t main(int32_t argc, char **argv) {
 
             // Endless loop; end the program by pressing Ctrl-C.
          while (od4.isRunning()) {
-             cv::Mat frame;
+             Mat frame;
+             Mat frame_HSV;
+             Mat frame_gray;
+             Mat frame_threshold;
              Mat cropped_frame;
              Mat finalFrame;
-             double area = 0;
              vector<vector<Point> > squares;
+
+             const int max_value_H = 360/2;
+             const int max_value = 255;
              // Wait for a notification of a new frame.
              sharedMemory->wait();
 
@@ -97,10 +102,24 @@ int32_t main(int32_t argc, char **argv) {
              sharedMemory->unlock();
 
              // TODO: Do something with the frame.
+
+
+             int low_H = 130;
+             int low_S = 50;
+             int low_V = 90;
+             int high_H = max_value_H;
+             int high_S = max_value;
+             int high_V = max_value;
+
             frame(Rect(Point(100, 150), Point(580, 400))).copyTo(cropped_frame);
 
-            findSquares(cropped_frame, squares);
-            finalFrame = drawSquares(cropped_frame, squares);
+            // Convert from BGR to HSV colorspace
+            cvtColor(cropped_frame, frame_HSV, COLOR_RGB2HSV);
+            // Detect the object based on HSV Range Values
+            inRange(frame_HSV, Scalar(low_H, low_S, low_V), Scalar(high_H, high_S, high_V), frame_threshold);
+
+            findSquares(frame_threshold, squares);
+            finalFrame = drawSquares(frame_threshold, squares);
 
             // show image with the tracked object
              // Example: Draw a red rectangle and display image.
@@ -161,7 +180,7 @@ static void findSquares( const Mat& image, vector<vector<Point> >& squares )
     vector<vector<Point> > contours;
 
     // find squares in every color plane of the image
-    for( int c = 0; c < 3; c++ )
+    for( int c = 0; c < 1; c++ )
     {
         int ch[] = {c, 0};
         mixChannels(&timg, 1, &gray0, 1, ch, 1);
@@ -224,7 +243,7 @@ static void findSquares( const Mat& image, vector<vector<Point> >& squares )
                // (all angles are ~90 degree) then write quandrange
                // vertices to resultant sequence
                if( maxCosine < 0.25 ) {
-                  cout << "Is rectangle. \n";
+                  // cout << "Is rectangle. \n";
                   if (area < 10000) {
                      cout << "Too far away. Speed up. \n";
                   }
@@ -251,11 +270,55 @@ static void findSquares( const Mat& image, vector<vector<Point> >& squares )
 // the function draws all the squares in the image
 static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares )
 {
+   Scalar color = Scalar(255,0,0 );
+   vector<Rect> boundRect( squares.size() );
+
     for( size_t i = 0; i < squares.size(); i++ )
     {
-        const Point* p = &squares[i][0];
-        int n = (int)squares[i].size();
-        polylines(image, &p, &n, 1, true, Scalar(0,255,0), 3, LINE_AA);
+        // const Point* p = &squares[i][0];
+        // int n = (int)squares[i].size();
+        // polylines(image, &p, &n, 1, true, Scalar(0,255,0), 3, LINE_AA);
+
+        // Code from http://answers.opencv.org/question/72237/measuring-width-height-of-bounding-box/
+      boundRect[i] = boundingRect(squares[i]);
+      rectangle(image, boundRect[i].tl(), boundRect[i].br(), color, 2 );
+
+        // Make sure that the Rect is filled in any possible way
+        int rect_x = boundRect[i].x;
+        int rect_y = boundRect[i].y;
+        int rect_width = boundRect[i].width;
+        int rect_height = boundRect[i].height;
+        double rect_area = boundRect[i].area();
+        // Point2d center = boundRect[i].tl() + 0.5 * Point2d(boundRect[i].size()); //tl = top left, br = bot right
+
+        double rect_centerX = rect_x + 0.5 * rect_width;
+        double rect_centerY = rect_y + 0.5 * rect_height;
+        int frame_center = 240;
+        int offset = 20;
+
+
+        // Now with those parameters you can calculate the 4 points
+        Point top_left(rect_x,rect_y);
+        Point top_right(rect_x + rect_width, rect_y);
+        Point bot_left(rect_x, rect_y + rect_height);
+        Point bot_right(rect_x + rect_width, rect_y + rect_height);
+
+        // cout << "rect_x:     " << rect_x << "\n";
+        // cout << "rect_y:     " << rect_y << "\n";
+        // cout << "rect_width:       " << rect_width << "\n";
+        // cout << "rect_height:      " << rect_height << "\n";
+        // cout << "area:       " << rect_area << "\n";
+        cout << "center X:       " << rect_centerX << "\n";
+
+        if (rect_centerX < frame_center - offset) {
+           cout << "      << car going left \n  ";
+        }
+        if (rect_centerX >= frame_center - offset && rect_centerX < frame_center + offset) {
+           cout << "      || car in front ||\n  ";
+        }
+        if (rect_centerX >= frame_center + offset) {
+           cout << "      car going right >> \n";
+        }
     }
 
    return image;

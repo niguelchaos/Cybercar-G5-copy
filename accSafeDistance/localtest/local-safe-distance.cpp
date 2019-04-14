@@ -22,7 +22,7 @@ static void help(const char* programName)
 {
     cout <<
     "\nA program using pyramid scaling, Canny, contours and contour simplification\n"
-    "to find squares in a list of images (pic1-6.png)\n"
+    "to find squares in a list of images\n"
     "Returns sequence of squares detected on the image.\n"
     "Call:\n"
     "./" << programName << " [file_name (optional)]\n"
@@ -58,7 +58,7 @@ static void findSquares( const Mat& image, vector<vector<Point> >& squares )
     vector<vector<Point> > contours;
 
     // find squares in every color plane of the image
-    for( int c = 0; c < 3; c++ )
+    for( int c = 0; c < 1; c++ )
     {
         int ch[] = {c, 0};
         mixChannels(&timg, 1, &gray0, 1, ch, 1);
@@ -164,7 +164,7 @@ static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares )
     for( size_t i = 0; i < squares.size(); i++ )
     {
         // const Point* p = &squares[i][0];
-        int n = (int)squares[i].size();
+        // int n = (int)squares[i].size();
         // cout << "n: " << n << "\n";
         // polylines(image, &p, &n, 1, true, Scalar(0,255,0), 3, LINE_AA);
 
@@ -216,9 +216,23 @@ static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares )
 int main(int argc, char** argv) {
 
    Mat frame;
+   Mat frame_HSV;
+   Mat frame_gray;
+   Mat frame_threshold;
    Mat finalFrame;
    vector<vector<Point> > squares;
-   vector<Rect> boundRect;
+
+   const int max_value_H = 360/2;
+   const int max_value = 255;
+
+   int low_H = 140;
+   int low_S = 50;
+   int low_V = 50;
+   int high_H = max_value_H;
+   int high_S = max_value;
+   int high_V = max_value;
+
+
    // Capture the video stream from default or supplied capturing device.
    VideoCapture cap(argc > 1 ? atoi(argv[1]) : 0);
    // Rect2d roi;
@@ -248,9 +262,17 @@ int main(int argc, char** argv) {
    //    tracker->update(frame,roi);
       // draw the tracked object
       // rectangle( frame, roi, Scalar( 255, 0, 0 ), 2, 1 );
+      // Convert from BGR to HSV colorspace
+      cvtColor(frame, frame_HSV, COLOR_BGR2HSV);
+      // Detect the object based on HSV Range Values
+      inRange(frame_HSV, Scalar(low_H, low_S, low_V), Scalar(high_H, high_S, high_V), frame_threshold);
 
-      findSquares(frame, squares);
-      finalFrame = drawSquares(frame, squares);
+      // convert it into grayscale and blur it to get rid of the noise.
+      // cvtColor( frame, frame_gray, COLOR_BGR2GRAY );
+      // blur( frame_gray, frame_gray, Size(3,3) );
+
+      findSquares(frame_threshold, squares);
+      finalFrame = drawSquares(frame_threshold, squares);
 
       // show image with the tracked object
       imshow("Rectangle Detector", finalFrame);
