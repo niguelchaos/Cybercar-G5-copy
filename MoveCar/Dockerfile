@@ -1,5 +1,5 @@
 FROM alpine:3.7 as builder
-MAINTAINER Yue Kang yuek@chalmers.se
+MAINTAINER Elsada Lagumdzic elsada@chalmers.se
 RUN apk update && \
     apk --no-cache add \
         ca-certificates \
@@ -12,15 +12,15 @@ RUN cd /opt/sources && \
     mkdir build && \
     cd build && \
     cmake -D CMAKE_BUILD_TYPE=Release .. && \
-    make example && cp example /tmp
+    make follow && cp follow /tmp
 
 # Deploy.
 FROM alpine:3.7
-MAINTAINER Yue Kang yuek@chalmers.se
+MAINTAINER Elsada Lagumdzic elsada@chalmers.se
 RUN apk update && \
     apk --no-cache add \
         libstdc++ libgcc && \
     mkdir /opt
 WORKDIR /opt
-COPY --from=builder /tmp/example .
-CMD ["/opt/example --cid=112 --verbose"]
+COPY --from=builder /tmp/follow .
+CMD ["/opt/follow --cid=112 --verbose"]

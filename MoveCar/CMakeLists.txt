@@ -16,7 +16,7 @@
 #
  
 cmake_minimum_required(VERSION 3.2)
-project(example)
+project(follow)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Werror")
 
@@ -48,6 +48,6 @@ add_custom_target(messages.hpp
 include_directories(SYSTEM ${CMAKE_BINARY_DIR})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
 
-add_executable(${PROJECT_NAME} ${CMAKE_CURRENT_SOURCE_DIR}/src/Example.cpp)
+add_executable(${PROJECT_NAME} ${CMAKE_CURRENT_SOURCE_DIR}/src/Follow.cpp)
 add_dependencies(${PROJECT_NAME} messages.hpp)
 target_link_libraries(${PROJECT_NAME} ${LIBRARIES})
