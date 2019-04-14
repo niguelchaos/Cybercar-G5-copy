@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019 Yue Kang
+ * Copyright (C) 2019 Elsada Lagumdzic
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
