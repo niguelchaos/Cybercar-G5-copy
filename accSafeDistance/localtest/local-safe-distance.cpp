@@ -9,7 +9,7 @@
 #include "opencv2/imgproc.hpp"
 #include "opencv2/imgcodecs.hpp"
 #include "opencv2/highgui.hpp"
-// #include <opencv2/tracker.hpp>
+// #include <opencv2/tracking.hpp>
 #include <opencv2/videoio.hpp>
 #include <cstring>
 
@@ -31,7 +31,7 @@ static void help(const char* programName)
 
 
 int thresh = 50, N = 11;
-const char* wndname = "Square Detection Demo";
+// const char* wndname = "Square Detection Demo";
 
 // helper function:
 // finds a cosine of angle between vectors
@@ -88,12 +88,14 @@ static void findSquares( const Mat& image, vector<vector<Point> >& squares )
             findContours(gray, contours, RETR_LIST, CHAIN_APPROX_SIMPLE);
 
             vector<Point> approx;
+            // vector<Rect> boundRect( contours.size() );
 
             // test each contour
             for( size_t i = 0; i < contours.size(); i++ )
             {
                 // approximate contour with accuracy proportional
                 // to the contour perimeter
+                // approxPolyDP(InputArray curve, OutputArray approxCurve, double epsilon, bool closed)
                 approxPolyDP(contours[i], approx, arcLength(contours[i], true)*0.02, true);
 
                 // square contours should have 4 vertices after approximation
@@ -110,6 +112,8 @@ static void findSquares( const Mat& image, vector<vector<Point> >& squares )
 
                double maxCosine = 0;
                double area = contourArea(approx);
+               double length = arcLength(contours[i], true);
+
                for( int j = 2; j < 5; j++ )
                {
                   // find the maximum cosine of the angle between joint edges
@@ -121,7 +125,9 @@ static void findSquares( const Mat& image, vector<vector<Point> >& squares )
                // (all angles are ~90 degree) then write quandrange
                // vertices to resultant sequence
                if( maxCosine < 0.2 ) {
-                  cout << "Is rectangle. \n";
+                  // cout << "Is rectangle. \n";
+                  // boundRect[i] = boundingRect( contours[i] );
+
                   if (area < 10000) {
                      cout << "Too far away. Speed up. \n";
                   }
@@ -129,6 +135,7 @@ static void findSquares( const Mat& image, vector<vector<Point> >& squares )
                      cout << "Catching up. Begin matching speed. \n";
                   }
                   if (area >= 30000 && area < 40000) {
+                     // cout << "length: " << length << "\n";
                      cout << "Optimal. Match Speed. \n";
                   }
                   if (area >= 40000 && area < 60000) {
@@ -150,11 +157,57 @@ static void findSquares( const Mat& image, vector<vector<Point> >& squares )
 // the function draws all the squares in the image
 static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares )
 {
+    Scalar color = Scalar(255,0,0 );
+    vector<Rect> boundRect( squares.size() );
+
+    // for each square...
     for( size_t i = 0; i < squares.size(); i++ )
     {
-        const Point* p = &squares[i][0];
+        // const Point* p = &squares[i][0];
         int n = (int)squares[i].size();
-        polylines(image, &p, &n, 1, true, Scalar(0,255,0), 3, LINE_AA);
+        // cout << "n: " << n << "\n";
+        // polylines(image, &p, &n, 1, true, Scalar(0,255,0), 3, LINE_AA);
+
+        // Code from http://answers.opencv.org/question/72237/measuring-width-height-of-bounding-box/
+        boundRect[i] = boundingRect(squares[i]);
+        rectangle(image, boundRect[i].tl(), boundRect[i].br(), color, 2 );
+
+         // Make sure that the Rect is filled in any possible way
+         int rect_x = boundRect[i].x;
+         int rect_y = boundRect[i].y;
+         int rect_width = boundRect[i].width;
+         int rect_height = boundRect[i].height;
+         double rect_area = boundRect[i].area();
+         // Point2d center = boundRect[i].tl() + 0.5 * Point2d(boundRect[i].size()); //tl = top left, br = bot right
+
+         double centerX = rect_x + 0.5 * rect_width;
+         double centerY = rect_y + 0.5 * rect_height;
+
+
+         // Now with those parameters you can calculate the 4 points
+         Point top_left(rect_x,rect_y);
+         Point top_right(rect_x + rect_width, rect_y);
+         Point bot_left(rect_x, rect_y + rect_height);
+         Point bot_right(rect_x + rect_width, rect_y + rect_height);
+
+         // cout << "rect_x:     " << rect_x << "\n";
+         // cout << "rect_y:     " << rect_y << "\n";
+         // cout << "rect_width:       " << rect_width << "\n";
+         // cout << "rect_height:      " << rect_height << "\n";
+         // cout << "area:       " << rect_area << "\n";
+         cout << "center X:       " << centerX << "\n";
+
+         if (centerX < 300) {
+            cout << "      << car going left \n  ";
+         }
+         if (centerX >= 300 && centerX < 340) {
+            cout << "      || car in front ||\n  ";
+         }
+         if (centerX >= 340) {
+            cout << "      car going right >> \n";
+         }
+
+
     }
 
    return image;
@@ -164,34 +217,50 @@ int main(int argc, char** argv) {
 
    Mat frame;
    Mat finalFrame;
-   double area = 0;
-
+   vector<vector<Point> > squares;
+   vector<Rect> boundRect;
    // Capture the video stream from default or supplied capturing device.
    VideoCapture cap(argc > 1 ? atoi(argv[1]) : 0);
-
-   // Until the user wants the program to exit do the following
+   // Rect2d roi;
+   // create a tracker object
+   // Ptr<Tracker> tracker = Tracker::create( "KCF" );
+   // // Until the user wants the program to exit do the following
    while (true) {
    // get frame from the video
      cap >> frame;
-
+   //   roi=selectROI("tracker",frame);
+   //
      if(frame.empty()) {
          break;
          help(argv[0]);
      }
+   //   // initialize the tracker
+   //   tracker->init(frame,roi);
 
-      vector<vector<Point> > squares;
+   //
+   //    // perform the tracking process
+   //    printf("Start the tracking process, press ESC to quit.\n");
+   //
+   //    // stop the program if no more images
+   //    if(frame.rows==0 || frame.cols==0)
+   //    break;
+   //    // update the tracking result
+   //    tracker->update(frame,roi);
+      // draw the tracked object
+      // rectangle( frame, roi, Scalar( 255, 0, 0 ), 2, 1 );
 
       findSquares(frame, squares);
       finalFrame = drawSquares(frame, squares);
 
       // show image with the tracked object
-      imshow("Rectangle Detector", frame);
+      imshow("Rectangle Detector", finalFrame);
+      // // show image with the tracked object
+      // imshow("tracker",frame);
 
       int key = (char) waitKey(30);
       if ( key == 'q' || key == 27 ) {
           break;
       }
-
-  }
+   }
     return 0;
 }

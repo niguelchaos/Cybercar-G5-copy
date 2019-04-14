@@ -15,11 +15,22 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+ // parts of Code copied from https://github.com/opencv/opencv/blob/master/samples/cpp/squares.cpp
+ // https://docs.opencv.org/3.1.0/d2/d0a/tutorial_introduction_to_tracker.html
+
+ // The "Square Detector" program.
+ // It loads several images sequentially and tries to find squares in
+ // each image
+
+
 #include "cluon-complete.hpp"
 #include "opendlv-standard-message-set.hpp"
 
+#include "opencv2/core.hpp"
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
+#include "opencv2/imgcodecs.hpp"
+// #include <opencv2/tracking.hpp>
 
 #include <cstdint>
 #include <iostream>
@@ -28,6 +39,10 @@
 
 using namespace std;
 using namespace cv;
+
+static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares );
+static void findSquares( const Mat& image, vector<vector<Point> >& squares );
+static double angle( Point pt1, Point pt2, Point pt0 );
 
 int32_t main(int32_t argc, char **argv) {
     int32_t retCode{1};
@@ -61,11 +76,10 @@ int32_t main(int32_t argc, char **argv) {
             // Endless loop; end the program by pressing Ctrl-C.
          while (od4.isRunning()) {
              cv::Mat frame;
-             cv::Mat gray;
-             cv::Mat bw;
-             cv::Mat dst;
-             std::vector < std::vector > contours;
-             std::vector approx;
+             Mat cropped_frame;
+             Mat finalFrame;
+             double area = 0;
+             vector<vector<Point> > squares;
              // Wait for a notification of a new frame.
              sharedMemory->wait();
 
@@ -78,18 +92,23 @@ int32_t main(int32_t argc, char **argv) {
                  // computationally heavy algorithms should be placed outside
                  // lock/unlock.
                  cv::Mat wrapped(HEIGHT, WIDTH, CV_8UC4, sharedMemory->data());
-                 img = wrapped.clone();
+                 frame = wrapped.clone();
              }
              sharedMemory->unlock();
 
              // TODO: Do something with the frame.
+            frame(Rect(Point(100, 150), Point(580, 400))).copyTo(cropped_frame);
 
+            findSquares(cropped_frame, squares);
+            finalFrame = drawSquares(cropped_frame, squares);
+
+            // show image with the tracked object
              // Example: Draw a red rectangle and display image.
-             cv::rectangle(img, cv::Point(50, 50), cv::Point(100, 100), cv::Scalar(0,0,255));
+             // cv::rectangle(img, cv::Point(50, 50), cv::Point(100, 100), cv::Scalar(0,0,255));
 
              // Display image.
             if (VERBOSE) {
-                 cv::imshow(sharedMemory->name().c_str(), img);
+                 cv::imshow(sharedMemory->name().c_str(), finalFrame);
                  cv::waitKey(1);
               }
          }
@@ -114,16 +133,130 @@ static double angle(cv::Point pt1, cv::Point pt2, cv::Point pt0) {
 /**
  * Helper function to display text in the center of a contour
  */
-void setLabel(cv::Mat& im, const std::string label, std::vector& contour) {
-    int fontface = cv::FONT_HERSHEY_SIMPLEX;
-    double scale = 0.4;
-    int thickness = 1;
-    int baseline = 0;
+// void setLabel(cv::Mat& im, const std::string label, std::vector& contour) {
+//     int fontface = cv::FONT_HERSHEY_SIMPLEX;
+//     double scale = 0.4;
+//     int thickness = 1;
+//     int baseline = 0;
+//
+//     cv::Size text = cv::getTextSize(label, fontface, scale, thickness, &baseline);
+//     cv::Rect r = cv::boundingRect(contour);
+//
+//     cv::Point pt(r.x + ((r.width - text.width) / 2), r.y + ((r.height + text.height) / 2));
+//     cv::rectangle(im, pt + cv::Point(0, baseline), pt + cv::Point(text.width, -text.height), CV_RGB(255,255,255), CV_FILLED);
+//     cv::putText(im, label, pt, fontface, scale, CV_RGB(0,0,0), thickness, 8);
+// }
 
-    cv::Size text = cv::getTextSize(label, fontface, scale, thickness, &baseline);
-    cv::Rect r = cv::boundingRect(contour);
+// returns sequence of squares detected on the image.
+static void findSquares( const Mat& image, vector<vector<Point> >& squares )
+{
+   int thresh = 50, N = 11;
+    squares.clear();
 
-    cv::Point pt(r.x + ((r.width - text.width) / 2), r.y + ((r.height + text.height) / 2));
-    cv::rectangle(im, pt + cv::Point(0, baseline), pt + cv::Point(text.width, -text.height), CV_RGB(255,255,255), CV_FILLED);
-    cv::putText(im, label, pt, fontface, scale, CV_RGB(0,0,0), thickness, 8);
+    Mat pyr, timg, gray0(image.size(), CV_8U), gray;
+
+    // down-scale and upscale the image to filter out the noise
+    pyrDown(image, pyr, Size(image.cols/2, image.rows/2));
+    pyrUp(pyr, timg, image.size());
+    vector<vector<Point> > contours;
+
+    // find squares in every color plane of the image
+    for( int c = 0; c < 3; c++ )
+    {
+        int ch[] = {c, 0};
+        mixChannels(&timg, 1, &gray0, 1, ch, 1);
+
+        // try several threshold levels
+        for( int l = 0; l < N; l++ )
+        {
+            // hack: use Canny instead of zero threshold level.
+            // Canny helps to catch squares with gradient shading
+            if( l == 0 )
+            {
+                // apply Canny. Take the upper threshold from slider
+                // and set the lower to 0 (which forces edges merging)
+                Canny(gray0, gray, 0, thresh, 5);
+                // dilate canny output to remove potential
+                // holes between edge segments
+                dilate(gray, gray, Mat(), Point(-1,-1));
+            }
+            else
+            {
+                // apply threshold if l!=0:
+                //     tgray(x,y) = gray(x,y) < (l+1)*255/N ? 255 : 0
+                gray = gray0 >= (l+1)*255/N;
+            }
+
+            // find contours and store them all as a list
+            findContours(gray, contours, RETR_LIST, CHAIN_APPROX_SIMPLE);
+
+            vector<Point> approx;
+
+            // test each contour
+            for( size_t i = 0; i < contours.size(); i++ )
+            {
+                // approximate contour with accuracy proportional
+                // to the contour perimeter
+                approxPolyDP(contours[i], approx, arcLength(contours[i], true)*0.02, true);
+
+                // square contours should have 4 vertices after approximation
+                // relatively large area (to filter out noisy contours)
+                // and be convex.
+                // Note: absolute value (fabs) of an area is used because
+                // area may be positive or negative - in accordance with the
+                // contour orientation
+               if( approx.size() == 4 &&
+               fabs(contourArea(approx)) > 1000 &&
+               fabs(contourArea(approx)) < 200000 &&
+               isContourConvex(approx) ) {
+
+
+               double maxCosine = 0;
+               double area = contourArea(approx);
+               for( int j = 2; j < 5; j++ )
+               {
+                  // find the maximum cosine of the angle between joint edges
+                  double cosine = fabs(angle(approx[j%4], approx[j-2], approx[j-1]));
+                  maxCosine = MAX(maxCosine, cosine);
+               }
+
+               // if cosines of all angles are small
+               // (all angles are ~90 degree) then write quandrange
+               // vertices to resultant sequence
+               if( maxCosine < 0.25 ) {
+                  cout << "Is rectangle. \n";
+                  if (area < 10000) {
+                     cout << "Too far away. Speed up. \n";
+                  }
+                  if (area >= 10000 && area < 30000) {
+                     cout << "Catching up. Begin matching speed. \n";
+                  }
+                  if (area >= 30000 && area < 40000) {
+                     cout << "Optimal. Match Speed. \n";
+                  }
+                  if (area >= 40000 && area < 60000) {
+                     cout << "Slow down. Almost crashing. \n";
+                  }
+                  if (area >= 60000) {
+                     cout << "Stop. \n";
+                  }
+                  squares.push_back(approx);
+               }
+
+               }
+            }
+        }
+    }
+}
+// the function draws all the squares in the image
+static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares )
+{
+    for( size_t i = 0; i < squares.size(); i++ )
+    {
+        const Point* p = &squares[i][0];
+        int n = (int)squares[i].size();
+        polylines(image, &p, &n, 1, true, Scalar(0,255,0), 3, LINE_AA);
+    }
+
+   return image;
 }
