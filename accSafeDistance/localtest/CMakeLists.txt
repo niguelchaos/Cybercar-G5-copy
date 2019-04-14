@@ -15,6 +15,8 @@ set(OpenCV_DIR  ${Cyberphysical_DIR}/opencv-4.0.1)
 
 message("Cyberphysical_DIR = ${Cyberphysical_DIR}")
 message("OpenCV_DIR = ${OpenCV_DIR}")
+message("OpenCV include DIR = ${OpenCV_INCLUDE_DIRS}")
+message("binary dir = SYSTEM ${CMAKE_BINARY_DIR}")
 
 find_package(OpenCV REQUIRED)
 
