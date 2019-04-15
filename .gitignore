@@ -1,3 +1,4 @@
 
 # ignore vmbuild folder
 vmbuild/
+build/

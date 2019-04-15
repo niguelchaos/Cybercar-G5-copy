@@ -118,6 +118,7 @@ int32_t main(int32_t argc, char **argv) {
             // Detect the object based on HSV Range Values
             inRange(frame_HSV, Scalar(low_H, low_S, low_V), Scalar(high_H, high_S, high_V), frame_threshold);
 
+
             findSquares(frame_threshold, squares);
             finalFrame = drawSquares(frame_threshold, squares);
 
@@ -275,9 +276,9 @@ static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares )
 
     for( size_t i = 0; i < squares.size(); i++ )
     {
-        // const Point* p = &squares[i][0];
-        // int n = (int)squares[i].size();
-        // polylines(image, &p, &n, 1, true, Scalar(0,255,0), 3, LINE_AA);
+        const Point* p = &squares[i][0];
+        int n = (int)squares[i].size();
+        polylines(image, &p, &n, 1, true, Scalar(0,255,0), 3, LINE_AA);
 
         // Code from http://answers.opencv.org/question/72237/measuring-width-height-of-bounding-box/
       boundRect[i] = boundingRect(squares[i]);
