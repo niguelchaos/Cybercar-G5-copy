@@ -44,12 +44,12 @@ const int max_value = 255;
 
 const String window_detection_name = "Color thresholds";
 
-int low_H = 0;
-int low_S = 0;
-int low_V = 0;
-int high_H = max_value;
-int high_S = max_value;
-int high_V = max_value;
+int low_H = 130;
+int high_H = 180;
+int low_S = 40;
+int high_S = 255;
+int low_V = 180;
+int high_V = 255;
 
 int32_t main(int32_t argc, char **argv) {
     int32_t retCode{1};
@@ -73,10 +73,10 @@ int32_t main(int32_t argc, char **argv) {
         const bool VERBOSE{commandlineArguments.count("verbose") != 0};
 
       // Create a window to display the default frame and the threshold frame.
-      // namedWindow(window_capture_name);
+      //namedWindow(window_capture_name);
       namedWindow(window_detection_name);
 
-      // const int max_thresh = 255;
+     // const int max_thresh = 255;
 
 
 
@@ -134,17 +134,17 @@ int32_t main(int32_t argc, char **argv) {
 
                 cvtColor( cropped_img, img_gray, COLOR_RGB2GRAY);
                 GaussianBlur( img_gray, img_gray, Size(3,3),0,0 );
-                outlines = threshDrawing(cropped_img);
+                outlines = threshDrawing(img_threshold);
                 cropped_img = outlines + cropped_img;
                 // Example: Draw a red rectangle and display image.
-                // cv::rectangle(img, cv::Point(50, 50), cv::Point(100, 100), cv::Scalar(0,0,255));
+                cv::rectangle(img, cv::Point(50, 50), cv::Point(100, 100), cv::Scalar(0,0,255));
 
                 // Display image.
-                // if (VERBOSE) {
+                if (VERBOSE) {
                    cv::imshow("Color Threshold", img_threshold);
                     cv::imshow(sharedMemory->name().c_str(),cropped_img);
                     cv::waitKey(1);
-                // }
+                }
             }
         }
         retCode = 0;
@@ -181,6 +181,7 @@ cv::Mat threshDrawing(cv::Mat img) {
         // At last we find a minimum enclosing circle for every polygon and save it to center and radius vectors.
         // minEnclosingCircle( contours_poly[i], centers[i], radius[i] );
     }
+    
 
 // We found everything we need, all we have to do is to draw.
 // Create new Mat of unsigned 8-bit chars, filled with zeros. It will contain all the drawings we are going to make (rects and circles).
@@ -191,14 +192,14 @@ cv::Mat threshDrawing(cv::Mat img) {
 // and the minimal enclosing circle with it.
     for( size_t i = 0; i< contours.size(); i++ )
     {
-        Scalar color = Scalar(260,99,85 );
+        Scalar color = Scalar(0,0,255 );
         drawContours( drawing, contours_poly, (int)i, color );
         rectangle( drawing, boundRect[i].tl(), boundRect[i].br(), color, 2 );
         // circle( drawing, centers[i], (int)radius[i], color, 2 );
     }
 // Display the results: create a new window "Contours" and show everything we added to drawings on it.
-   // auto combinedFrame = drawing + frame;
-   // imshow( window_capture_name, combinedFrame );
+  // auto combinedFrame = drawing + frame;
+  // imshow( window_capture_name, combinedFrame );
    return drawing;
 }
 
