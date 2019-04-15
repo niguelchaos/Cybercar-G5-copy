@@ -12,6 +12,8 @@ find_package(Threads REQUIRED)
 # setting where OpenCV_DIR is, the root of the opencv folder, is enough.
 get_filename_component(Cyberphysical_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../" ABSOLUTE)
 set(OpenCV_DIR  ${Cyberphysical_DIR}/opencv-4.0.1)
+set(OpenCV_INCLUDE_DIRS ${OpenCV_DIR}/include)
+set(DOPENCV_EXTRA_MODULES_PATH ${OpenCV_DIR}/opencv_contrib-4.0.1/modules)
 
 message("Cyberphysical_DIR = ${Cyberphysical_DIR}")
 message("OpenCV_DIR = ${OpenCV_DIR}")
