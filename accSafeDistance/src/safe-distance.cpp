@@ -122,13 +122,15 @@ int32_t main(int32_t argc, char **argv) {
             findSquares(frame_threshold, squares);
             finalFrame = drawSquares(frame_threshold, squares);
 
+
+
             // show image with the tracked object
              // Example: Draw a red rectangle and display image.
              // cv::rectangle(img, cv::Point(50, 50), cv::Point(100, 100), cv::Scalar(0,0,255));
 
              // Display image.
             if (VERBOSE) {
-                 cv::imshow(sharedMemory->name().c_str(), finalFrame);
+                 // cv::imshow(sharedMemory->name().c_str(), finalFrame);
                  cv::waitKey(1);
               }
          }
