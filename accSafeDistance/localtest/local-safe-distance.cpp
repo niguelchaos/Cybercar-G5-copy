@@ -11,6 +11,7 @@
 #include "opencv2/highgui.hpp"
 // #include <opencv2/tracking.hpp>
 #include <opencv2/videoio.hpp>
+#include <opencv2/dnn.hpp>
 #include <cstring>
 
 #include <iostream>
@@ -213,6 +214,14 @@ static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares )
    return image;
 }
 
+void countCars(Mat frame, vector<vector<Point> >& squares) {
+   int squareNum =  squares.size();
+   std::string carcount = std::to_string(squareNum);
+   // cout << "Number of Squares:      " << carcount << "\n";
+   putText(frame, carcount, Point(5,100), FONT_HERSHEY_DUPLEX, 1, Scalar(255,255,255), 2);
+
+}
+
 int main(int argc, char** argv) {
 
    Mat frame;
@@ -273,6 +282,8 @@ int main(int argc, char** argv) {
 
       findSquares(frame_threshold, squares);
       finalFrame = drawSquares(frame_threshold, squares);
+
+      countCars(finalFrame, squares);
 
       // show image with the tracked object
       imshow("Rectangle Detector", finalFrame);
