@@ -259,7 +259,7 @@ message opendlv.system.NetworkStatusMessage [id = 1102] {
 }
 
 message opendlv.system.LogMessage [id = 1103] {
-  uint8 level [default = 6, id = 1]; // based on syslog: 0 = Emergency, 1 = Alert, 2 = Critical, 3 = Error, 4 = Warning, 5 = Notice, 6 = Informational, 7 = Debug   
+  uint8 level [default = 6, id = 1]; // based on syslog: 0 = Emergency, 1 = Alert, 2 = Critical, 3 = Error, 4 = Warning, 5 = Notice, 6 = Informational, 7 = Debug
   string description [id = 2];
 }
 
@@ -374,4 +374,18 @@ message opendlv.logic.cognition.GroundSteeringLimit [id = 1191] {
 
 message opendlv.logic.cognition.GroundSpeedLimit [id = 1192] {
   float speedLimit [id = 1];
+}
+
+
+
+message helloworld [id = 2000] {
+   string helloworld [id = 1];
+}
+
+message speedUp [id = 2001] {
+   float speed [id = 1];
+}
+
+message speedDown [id = 2002] {
+   float speed [id = 1];
 }
