@@ -43,6 +43,7 @@ using namespace cv;
 static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares );
 static void findSquares( const Mat& image, vector<vector<Point> >& squares );
 static double angle( Point pt1, Point pt2, Point pt0 );
+void countCars(Mat frame, vector<vector<Point> >& squares);
 
 int32_t main(int32_t argc, char **argv) {
     int32_t retCode{1};
@@ -78,6 +79,7 @@ int32_t main(int32_t argc, char **argv) {
              Mat frame;
              Mat frame_HSV;
              Mat frame_gray;
+             Mat cropped_frame;
              Mat frame_threshold_pink;
              Mat frame_threshold_yellow;
              Mat finalFramePink;
@@ -341,4 +343,12 @@ static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares )
     }
 
    return image;
+}
+
+void countCars(Mat frame, vector<vector<Point> >& squares) {
+   int squareNum =  squares.size();
+   std::string carcount = std::to_string(squareNum);
+   cout << "Detected      " << carcount << "cars. "<<"\n";
+   putText(frame, carcount, Point(5,100), FONT_HERSHEY_DUPLEX, 1, Scalar(255,255,255), 2);
+
 }

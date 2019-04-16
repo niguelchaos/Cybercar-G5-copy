@@ -228,11 +228,11 @@ int main(int argc, char** argv) {
    Mat frame_HSV;
    Mat frame_gray;
    Mat frame_threshold_pink;
-   Mat frame_threshold_yellow;
+   Mat frame_threshold_blue;
    Mat finalFramePink;
-   Mat finalFrameYellow;
+   Mat finalFrameBlue;
    vector<vector<Point> > pinkSquares;
-   vector<vector<Point> > yellowSquares;
+   vector<vector<Point> > blueSquares;
 
    const int max_value_H = 360/2;
    const int max_value = 255;
@@ -245,13 +245,13 @@ int main(int argc, char** argv) {
    int high_S_pink = max_value;
    int high_V_pink = max_value;
 
-// Yellow
-   int low_H_yellow = 20;
-   int low_S_yellow = 113;
-   int low_V_yellow = 134;
-   int high_H_yellow = 98;
-   int high_S_yellow = 255;
-   int high_V_yellow = 206;
+// Blue
+   int low_H_blue = 52;
+   int low_S_blue = 128;
+   int low_V_blue = 111;
+   int high_H_blue = 158;
+   int high_S_blue = 255;
+   int high_V_blue = 255;
 
 
    // Capture the video stream from default or supplied capturing device.
@@ -271,7 +271,7 @@ int main(int argc, char** argv) {
       cvtColor(frame, frame_HSV, COLOR_BGR2HSV);
       // Detect the object based on HSV Range Values
       inRange(frame_HSV, Scalar(low_H_pink, low_S_pink, low_V_pink), Scalar(high_H_pink, high_S_pink, high_V_pink), frame_threshold_pink);
-      inRange(frame_HSV, Scalar(low_H_yellow, low_S_yellow, low_V_yellow), Scalar(high_H_yellow, high_S_yellow, high_V_yellow), frame_threshold_yellow);
+      inRange(frame_HSV, Scalar(low_H_blue, low_S_blue, low_V_blue), Scalar(high_H_blue, high_S_blue, high_V_blue), frame_threshold_blue);
 
       // convert it into grayscale and blur it to get rid of the noise.
       // cvtColor( frame, frame_gray, COLOR_BGR2GRAY );
@@ -280,14 +280,14 @@ int main(int argc, char** argv) {
       findSquares(frame_threshold_pink, pinkSquares);
       finalFramePink = drawSquares(frame_threshold_pink, pinkSquares);
 
-      findSquares(frame_threshold_yellow, yellowSquares);
-      finalFrameYellow = drawSquares(frame_threshold_yellow, yellowSquares);
+      findSquares(frame_threshold_blue, blueSquares);
+      finalFrameBlue = drawSquares(frame_threshold_blue, blueSquares);
 
       countCars(finalFramePink, pinkSquares);
 
       // show image with the tracked object
       imshow("Pink", finalFramePink);
-      imshow("Yellow", finalFrameYellow);
+      imshow("Blue", finalFrameBlue);
 
       // // show image with the tracked object
       // imshow("tracker",frame);
