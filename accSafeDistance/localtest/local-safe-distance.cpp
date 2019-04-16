@@ -217,7 +217,7 @@ static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares )
 void countCars(Mat frame, vector<vector<Point> >& squares) {
    int squareNum =  squares.size();
    std::string carcount = std::to_string(squareNum);
-   // cout << "Number of Squares:      " << carcount << "\n";
+   cout << "Detected      " << carcount << "cars. "<<"\n";
    putText(frame, carcount, Point(5,100), FONT_HERSHEY_DUPLEX, 1, Scalar(255,255,255), 2);
 
 }
@@ -227,27 +227,36 @@ int main(int argc, char** argv) {
    Mat frame;
    Mat frame_HSV;
    Mat frame_gray;
-   Mat frame_threshold;
-   Mat finalFrame;
-   vector<vector<Point> > squares;
+   Mat frame_threshold_pink;
+   Mat frame_threshold_yellow;
+   Mat finalFramePink;
+   Mat finalFrameYellow;
+   vector<vector<Point> > pinkSquares;
+   vector<vector<Point> > yellowSquares;
 
    const int max_value_H = 360/2;
    const int max_value = 255;
 
-   int low_H = 140;
-   int low_S = 50;
-   int low_V = 50;
-   int high_H = max_value_H;
-   int high_S = max_value;
-   int high_V = max_value;
+// Pink
+   int low_H_pink = 130;
+   int low_S_pink = 55;
+   int low_V_pink = 180;
+   int high_H_pink = max_value_H;
+   int high_S_pink = max_value;
+   int high_V_pink = max_value;
+
+// Yellow
+   int low_H_yellow = 20;
+   int low_S_yellow = 113;
+   int low_V_yellow = 134;
+   int high_H_yellow = 98;
+   int high_S_yellow = 255;
+   int high_V_yellow = 206;
 
 
    // Capture the video stream from default or supplied capturing device.
    VideoCapture cap(argc > 1 ? atoi(argv[1]) : 0);
-   // Rect2d roi;
-   // create a tracker object
-   // Ptr<Tracker> tracker = Tracker::create( "KCF" );
-   // // Until the user wants the program to exit do the following
+
    while (true) {
    // get frame from the video
      cap >> frame;
@@ -257,36 +266,29 @@ int main(int argc, char** argv) {
          break;
          help(argv[0]);
      }
-   //   // initialize the tracker
-   //   tracker->init(frame,roi);
 
-   //
-   //    // perform the tracking process
-   //    printf("Start the tracking process, press ESC to quit.\n");
-   //
-   //    // stop the program if no more images
-   //    if(frame.rows==0 || frame.cols==0)
-   //    break;
-   //    // update the tracking result
-   //    tracker->update(frame,roi);
-      // draw the tracked object
-      // rectangle( frame, roi, Scalar( 255, 0, 0 ), 2, 1 );
       // Convert from BGR to HSV colorspace
       cvtColor(frame, frame_HSV, COLOR_BGR2HSV);
       // Detect the object based on HSV Range Values
-      inRange(frame_HSV, Scalar(low_H, low_S, low_V), Scalar(high_H, high_S, high_V), frame_threshold);
+      inRange(frame_HSV, Scalar(low_H_pink, low_S_pink, low_V_pink), Scalar(high_H_pink, high_S_pink, high_V_pink), frame_threshold_pink);
+      inRange(frame_HSV, Scalar(low_H_yellow, low_S_yellow, low_V_yellow), Scalar(high_H_yellow, high_S_yellow, high_V_yellow), frame_threshold_yellow);
 
       // convert it into grayscale and blur it to get rid of the noise.
       // cvtColor( frame, frame_gray, COLOR_BGR2GRAY );
       // blur( frame_gray, frame_gray, Size(3,3) );
 
-      findSquares(frame_threshold, squares);
-      finalFrame = drawSquares(frame_threshold, squares);
+      findSquares(frame_threshold_pink, pinkSquares);
+      finalFramePink = drawSquares(frame_threshold_pink, pinkSquares);
 
-      countCars(finalFrame, squares);
+      findSquares(frame_threshold_yellow, yellowSquares);
+      finalFrameYellow = drawSquares(frame_threshold_yellow, yellowSquares);
+
+      countCars(finalFramePink, pinkSquares);
 
       // show image with the tracked object
-      imshow("Rectangle Detector", finalFrame);
+      imshow("Pink", finalFramePink);
+      imshow("Yellow", finalFrameYellow);
+
       // // show image with the tracked object
       // imshow("tracker",frame);
 
