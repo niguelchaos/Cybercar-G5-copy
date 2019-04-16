@@ -78,10 +78,12 @@ int32_t main(int32_t argc, char **argv) {
              Mat frame;
              Mat frame_HSV;
              Mat frame_gray;
-             Mat frame_threshold;
-             Mat cropped_frame;
-             Mat finalFrame;
-             vector<vector<Point> > squares;
+             Mat frame_threshold_pink;
+             Mat frame_threshold_yellow;
+             Mat finalFramePink;
+             Mat finalFrameYellow;
+             vector<vector<Point> > pinkSquares;
+             vector<vector<Point> > yellowSquares;
 
              const int max_value_H = 360/2;
              const int max_value = 255;
@@ -104,24 +106,37 @@ int32_t main(int32_t argc, char **argv) {
              // TODO: Do something with the frame.
 
 
-             int low_H = 130;
-             int low_S = 50;
-             int low_V = 90;
-             int high_H = max_value_H;
-             int high_S = max_value;
-             int high_V = max_value;
+             // Pink
+               int low_H_pink = 130;
+               int low_S_pink = 55;
+               int low_V_pink = 100;
+               int high_H_pink = max_value_H;
+               int high_S_pink = max_value;
+               int high_V_pink = max_value;
+
+            // Yellow
+               int low_H_yellow = 20;
+               int low_S_yellow = 113;
+               int low_V_yellow = 134;
+               int high_H_yellow = 98;
+               int high_S_yellow = 255;
+               int high_V_yellow = 206;
 
             frame(Rect(Point(100, 150), Point(580, 400))).copyTo(cropped_frame);
 
             // Convert from BGR to HSV colorspace
             cvtColor(cropped_frame, frame_HSV, COLOR_RGB2HSV);
             // Detect the object based on HSV Range Values
-            inRange(frame_HSV, Scalar(low_H, low_S, low_V), Scalar(high_H, high_S, high_V), frame_threshold);
+            inRange(frame_HSV, Scalar(low_H_pink, low_S_pink, low_V_pink), Scalar(high_H_pink, high_S_pink, high_V_pink), frame_threshold_pink);
+            inRange(frame_HSV, Scalar(low_H_yellow, low_S_yellow, low_V_yellow), Scalar(high_H_yellow, high_S_yellow, high_V_yellow), frame_threshold_yellow);
 
+            findSquares(frame_threshold_pink, pinkSquares);
+            finalFramePink = drawSquares(frame_threshold_pink, pinkSquares);
 
-            findSquares(frame_threshold, squares);
-            finalFrame = drawSquares(frame_threshold, squares);
+            findSquares(frame_threshold_yellow, yellowSquares);
+            finalFrameYellow = drawSquares(frame_threshold_yellow, yellowSquares);
 
+            countCars(finalFramePink, pinkSquares);
 
 
             // show image with the tracked object
@@ -130,7 +145,8 @@ int32_t main(int32_t argc, char **argv) {
 
              // Display image.
             if (VERBOSE) {
-                 // cv::imshow(sharedMemory->name().c_str(), finalFrame);
+               // imshow("Pink", finalFramePink);
+               // imshow("Yellow", finalFrameYellow);
                  cv::waitKey(1);
               }
          }
