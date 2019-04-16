@@ -227,6 +227,7 @@ int main(int argc, char** argv) {
    Mat frame;
    Mat frame_HSV;
    Mat frame_gray;
+   Mat cropped_frame;
    Mat frame_threshold_pink;
    Mat frame_threshold_blue;
    Mat finalFramePink;
