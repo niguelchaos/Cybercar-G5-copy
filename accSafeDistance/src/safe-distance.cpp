@@ -40,9 +40,12 @@
 using namespace std;
 using namespace cv;
 
-static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares );
+static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int followcar );
 static void findSquares( const Mat& image, vector<vector<Point> >& squares );
 static double angle( Point pt1, Point pt2, Point pt0 );
+void countCars(Mat frame, vector<vector<Point> >& squares);
+void checkCarPosition(double centerX) ;
+void checkCarDistance(double area);
 
 int32_t main(int32_t argc, char **argv) {
     int32_t retCode{1};
@@ -78,6 +81,7 @@ int32_t main(int32_t argc, char **argv) {
              Mat frame;
              Mat frame_HSV;
              Mat frame_gray;
+             Mat cropped_frame;
              Mat frame_threshold_pink;
              Mat frame_threshold_yellow;
              Mat finalFramePink;
@@ -114,13 +118,13 @@ int32_t main(int32_t argc, char **argv) {
                int high_S_pink = max_value;
                int high_V_pink = max_value;
 
-            // Yellow
-               int low_H_yellow = 20;
-               int low_S_yellow = 113;
-               int low_V_yellow = 134;
-               int high_H_yellow = 98;
-               int high_S_yellow = 255;
-               int high_V_yellow = 206;
+            // Green
+               int low_H_yellow = 42;
+               int low_S_yellow = 18;
+               int low_V_yellow = 102;
+               int high_H_yellow = 92;
+               int high_S_yellow = 182;
+               int high_V_yellow = 255;
 
             frame(Rect(Point(100, 150), Point(580, 400))).copyTo(cropped_frame);
 
@@ -131,10 +135,10 @@ int32_t main(int32_t argc, char **argv) {
             inRange(frame_HSV, Scalar(low_H_yellow, low_S_yellow, low_V_yellow), Scalar(high_H_yellow, high_S_yellow, high_V_yellow), frame_threshold_yellow);
 
             findSquares(frame_threshold_pink, pinkSquares);
-            finalFramePink = drawSquares(frame_threshold_pink, pinkSquares);
+            finalFramePink = drawSquares(frame_threshold_pink, pinkSquares, 0);
 
             findSquares(frame_threshold_yellow, yellowSquares);
-            finalFrameYellow = drawSquares(frame_threshold_yellow, yellowSquares);
+            finalFrameYellow = drawSquares(frame_threshold_yellow, yellowSquares, 1);
 
             countCars(finalFramePink, pinkSquares);
 
@@ -250,7 +254,7 @@ static void findSquares( const Mat& image, vector<vector<Point> >& squares )
 
 
                double maxCosine = 0;
-               double area = contourArea(approx);
+               // double area = contourArea(approx);
                for( int j = 2; j < 5; j++ )
                {
                   // find the maximum cosine of the angle between joint edges
@@ -263,21 +267,6 @@ static void findSquares( const Mat& image, vector<vector<Point> >& squares )
                // vertices to resultant sequence
                if( maxCosine < 0.25 ) {
                   // cout << "Is rectangle. \n";
-                  if (area < 10000) {
-                     cout << "Too far away. Speed up. \n";
-                  }
-                  if (area >= 10000 && area < 30000) {
-                     cout << "Catching up. Begin matching speed. \n";
-                  }
-                  if (area >= 30000 && area < 40000) {
-                     cout << "Optimal. Match Speed. \n";
-                  }
-                  if (area >= 40000 && area < 60000) {
-                     cout << "Slow down. Almost crashing. \n";
-                  }
-                  if (area >= 60000) {
-                     cout << "Stop. \n";
-                  }
                   squares.push_back(approx);
                }
 
@@ -286,8 +275,42 @@ static void findSquares( const Mat& image, vector<vector<Point> >& squares )
         }
     }
 }
+
+void checkCarDistance(double area) {
+   if (area < 10000) {
+      cout << "Too far away. Speed up. \n";
+   }
+   if (area >= 10000 && area < 30000) {
+      cout << "Catching up. Begin matching speed. \n";
+   }
+   if (area >= 30000 && area < 40000) {
+      // cout << "length: " << length << "\n";
+      cout << "Optimal. Match Speed. \n";
+   }
+   if (area >= 40000 && area < 60000) {
+      cout << "Slow down. Almost crashing. \n";
+   }
+   if (area >= 60000) {
+      cout << "Stop. \n";
+   }
+}
+
+void checkCarPosition(double centerX, int frame_center, int offset) {
+   cout << "center X:       " << centerX << "\n";
+
+   if (centerX < frame_center - offset) {
+      cout << "      << car going left \n  ";
+   }
+   if (centerX >= frame_center - offset && centerX < frame_center + offset) {
+      cout << "      || car in front ||\n  ";
+   }
+   if (centerX >= frame_center + offset) {
+      cout << "      car going right >> \n";
+   }
+}
+
 // the function draws all the squares in the image
-static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares )
+static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int followcar) // 0 = pink/other car, 1 = yellow/acc car
 {
    Scalar color = Scalar(255,0,0 );
    vector<Rect> boundRect( squares.size() );
@@ -322,23 +345,26 @@ static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares )
         Point bot_left(rect_x, rect_y + rect_height);
         Point bot_right(rect_x + rect_width, rect_y + rect_height);
 
+        if (followcar == 1) { // Yellow = if car is the one we are following, check position and distance
+           checkCarDistance(rect_area);
+           checkCarPosition(rect_centerX, frame_center, offset);
+        }
+
         // cout << "rect_x:     " << rect_x << "\n";
         // cout << "rect_y:     " << rect_y << "\n";
         // cout << "rect_width:       " << rect_width << "\n";
         // cout << "rect_height:      " << rect_height << "\n";
         // cout << "area:       " << rect_area << "\n";
-        cout << "center X:       " << rect_centerX << "\n";
 
-        if (rect_centerX < frame_center - offset) {
-           cout << "      << car going left \n  ";
-        }
-        if (rect_centerX >= frame_center - offset && rect_centerX < frame_center + offset) {
-           cout << "      || car in front ||\n  ";
-        }
-        if (rect_centerX >= frame_center + offset) {
-           cout << "      car going right >> \n";
-        }
     }
 
    return image;
+}
+
+void countCars(Mat frame, vector<vector<Point> >& squares) {
+   int squareNum =  squares.size();
+   std::string carcount = std::to_string(squareNum);
+   cout << "Detected      " << carcount << "cars. "<<"\n";
+   putText(frame, carcount, Point(5,100), FONT_HERSHEY_DUPLEX, 1, Scalar(255,255,255), 2);
+
 }
