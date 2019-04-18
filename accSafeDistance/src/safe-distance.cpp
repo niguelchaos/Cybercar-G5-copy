@@ -39,13 +39,14 @@
 
 using namespace std;
 using namespace cv;
+using namespace cluon;
 
-static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int followcar );
+static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int followcar, OD4Session *od4 );
 static void findSquares( const Mat& image, vector<vector<Point> >& squares );
 static double angle( Point pt1, Point pt2, Point pt0 );
 void countCars(Mat frame, vector<vector<Point> >& squares);
-void checkCarPosition(double centerX) ;
-void checkCarDistance(double area);
+void checkCarPosition(double centerX, OD4Session *od4) ;
+void checkCarDistance(double area, OD4Session *od4);
 
 int32_t main(int32_t argc, char **argv) {
     int32_t retCode{1};
@@ -108,7 +109,10 @@ int32_t main(int32_t argc, char **argv) {
              sharedMemory->unlock();
 
              // TODO: Do something with the frame.
-
+             HelloWorld helloworld;
+             helloworld.helloworld("Hello world aaaaaaaaaa");
+             od4.send(helloworld);
+             cout << "sent helloworld" <<"\n";
 
              // Pink
                int low_H_pink = 130;
@@ -135,10 +139,10 @@ int32_t main(int32_t argc, char **argv) {
             inRange(frame_HSV, Scalar(low_H_yellow, low_S_yellow, low_V_yellow), Scalar(high_H_yellow, high_S_yellow, high_V_yellow), frame_threshold_yellow);
 
             findSquares(frame_threshold_pink, pinkSquares);
-            finalFramePink = drawSquares(frame_threshold_pink, pinkSquares, 0);
+            finalFramePink = drawSquares(frame_threshold_pink, pinkSquares, 0, &od4);
 
             findSquares(frame_threshold_yellow, yellowSquares);
-            finalFrameYellow = drawSquares(frame_threshold_yellow, yellowSquares, 1);
+            finalFrameYellow = drawSquares(frame_threshold_yellow, yellowSquares, 1, &od4);
 
             countCars(finalFramePink, pinkSquares);
 
@@ -276,12 +280,17 @@ static void findSquares( const Mat& image, vector<vector<Point> >& squares )
     }
 }
 
-void checkCarDistance(double area) {
+void checkCarDistance(double area, OD4Session *od4) {
+   SpeedUp speedup;
    if (area < 10000) {
       cout << "Too far away. Speed up. \n";
+      speedup.speed(0.01f);
+      od4->send(speedup);
    }
    if (area >= 10000 && area < 30000) {
       cout << "Catching up. Begin matching speed. \n";
+      speedup.speed(0.005f);
+      od4->send(speedup);
    }
    if (area >= 30000 && area < 40000) {
       // cout << "length: " << length << "\n";
@@ -295,7 +304,7 @@ void checkCarDistance(double area) {
    }
 }
 
-void checkCarPosition(double centerX, int frame_center, int offset) {
+void checkCarPosition(double centerX, int frame_center, int offset, OD4Session *od4) {
    cout << "center X:       " << centerX << "\n";
 
    if (centerX < frame_center - offset) {
@@ -310,7 +319,7 @@ void checkCarPosition(double centerX, int frame_center, int offset) {
 }
 
 // the function draws all the squares in the image
-static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int followcar) // 0 = pink/other car, 1 = yellow/acc car
+static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int followcar, OD4Session *od4) // 0 = pink/other car, 1 = yellow/acc car
 {
    Scalar color = Scalar(255,0,0 );
    vector<Rect> boundRect( squares.size() );
@@ -346,8 +355,8 @@ static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int f
         Point bot_right(rect_x + rect_width, rect_y + rect_height);
 
         if (followcar == 1) { // Yellow = if car is the one we are following, check position and distance
-           checkCarDistance(rect_area);
-           checkCarPosition(rect_centerX, frame_center, offset);
+           checkCarDistance(rect_area, od4);
+           checkCarPosition(rect_centerX, frame_center, offset, od4);
         }
 
         // cout << "rect_x:     " << rect_x << "\n";

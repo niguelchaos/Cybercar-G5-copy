@@ -14,10 +14,14 @@
 #include <opencv2/dnn.hpp>
 #include <cstring>
 
+#include "cluon-complete.hpp"
+#include "opendlv-standard-message-set.hpp"
+
 #include <iostream>
 
 using namespace cv;
 using namespace std;
+using namespace cluon;
 
 static void help(const char* programName)
 {
@@ -37,7 +41,7 @@ int thresh = 50, N = 11;
 // helper function:
 // finds a cosine of angle between vectors
 // from pt0->pt1 and from pt0->pt2
-static double angle( Point pt1, Point pt2, Point pt0 )
+double angle( Point pt1, Point pt2, Point pt0 )
 {
     double dx1 = pt1.x - pt0.x;
     double dy1 = pt1.y - pt0.y;
@@ -47,7 +51,7 @@ static double angle( Point pt1, Point pt2, Point pt0 )
 }
 
 // returns sequence of squares detected on the image.
-static void findSquares( const Mat& image, vector<vector<Point> >& squares )
+void findSquares( const Mat& image, vector<vector<Point> >& squares )
 {
     squares.clear();
 
@@ -138,42 +142,55 @@ static void findSquares( const Mat& image, vector<vector<Point> >& squares )
     }
 }
 
-void checkCarDistance(double area) {
+double checkCarDistance(double area) {
+   double speedlevel;
    if (area < 10000) {
       cout << "Too far away. Speed up. \n";
+      speedlevel = 0.01;
    }
    if (area >= 10000 && area < 30000) {
       cout << "Catching up. Begin matching speed. \n";
+      speedlevel = 0.005;
    }
    if (area >= 30000 && area < 40000) {
       // cout << "length: " << length << "\n";
       cout << "Optimal. Match Speed. \n";
+      speedlevel = 0;
    }
    if (area >= 40000 && area < 60000) {
       cout << "Slow down. Almost crashing. \n";
+      speedlevel = -0.005;
    }
    if (area >= 60000) {
       cout << "Stop. \n";
+      speedlevel = -0.01;
    }
+   return speedlevel;
 }
 
-void checkCarPosition(double centerX, int frame_center, int offset) {
+double checkCarPosition(double centerX, int frame_center, int offset) {
+   double position = 0;
    cout << "center X:       " << centerX << "\n";
 
    if (centerX < frame_center - offset) {
       cout << "      << car going left \n  ";
+      position = 0.1;
    }
    if (centerX >= frame_center - offset && centerX < frame_center + offset) {
       cout << "      || car in front ||\n  ";
+      position = 0;
    }
    if (centerX >= frame_center + offset) {
       cout << "      car going right >> \n";
+      position = -0.1;
    }
+   return position;
 }
 
 // the function draws all the squares in the image
-static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int followcar ) // 0 = pink/other car, 1 = yellow/acc car
+Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int followcar, double *carResult ) // 0 = pink/other car, 1 = yellow/acc car
 {
+   int returnmsg; // -1 = speed down, 0 = nothing, 1 = speedup
     Scalar color = Scalar(255,0,0 );
     vector<Rect> boundRect( squares.size() );
 
@@ -209,10 +226,19 @@ static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int f
          Point bot_left(rect_x, rect_y + rect_height);
          Point bot_right(rect_x + rect_width, rect_y + rect_height);
 
+
+
          if (followcar == 1) { // Yellow = if car is the one we are following, check position and distance
-            checkCarDistance(rect_area);
-            checkCarPosition(rect_centerX, frame_center, offset);
+            double carDistance = 0;
+            double carPosition = 0;
+
+            carDistance = checkCarDistance(rect_area);
+            carPosition = checkCarPosition(rect_centerX, frame_center, offset);
+            carResult[0] = carDistance;
+            carResult[1] = carPosition;
          }
+
+
 
          // cout << "rect_x:     " << rect_x << "\n";
          // cout << "rect_y:     " << rect_y << "\n";
@@ -230,7 +256,7 @@ static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int f
 void countCars(Mat frame, vector<vector<Point> >& squares) {
    int squareNum =  squares.size();
    std::string carcount = std::to_string(squareNum);
-   cout << "Detected      " << carcount << "cars. "<<"\n";
+   // cout << "Detected      " << carcount << "cars. "<<"\n";
    putText(frame, carcount, Point(5,100), FONT_HERSHEY_DUPLEX, 1, Scalar(255,255,255), 2);
 
 }
@@ -267,6 +293,24 @@ int main(int argc, char** argv) {
    int high_V_yellow = 206;
 
 
+
+   // Interface to a running OpenDaVINCI session; here, you can send and receive messages.
+   static cluon::OD4Session od4(123,
+     [](cluon::data::Envelope &&envelope) noexcept {
+     if (envelope.dataType() == 2000) {
+        HelloWorld receivedHello = cluon::extractMessage<HelloWorld>(std::move(envelope));
+        std::cout << receivedHello.helloworld() << std::endl;
+     }
+     if (envelope.dataType() == 2001) {
+        SpeedUp speedup = cluon::extractMessage<SpeedUp>(std::move(envelope));
+        std::cout << speedup.speed() << std::endl;
+     }
+     if (envelope.dataType() == 2002) {
+        SpeedDown speeddown = cluon::extractMessage<SpeedDown>(std::move(envelope));
+        std::cout << speeddown.speed() << std::endl;
+     }
+   });
+
    // Capture the video stream from default or supplied capturing device.
    VideoCapture cap(argc > 1 ? atoi(argv[1]) : 0);
 
@@ -280,6 +324,17 @@ int main(int argc, char** argv) {
          help(argv[0]);
      }
 
+     HelloWorld helloworld;
+     helloworld.helloworld("Hello world aaaaaaaaaa");
+     od4.send(helloworld);
+
+     opendlv::logic::SpeedUp speedup;
+     SpeedDown speeddown;
+     double carResult[2]; // slot 0 = distance, 1 = position
+
+     carResult[0] = 0;
+     carResult[1] = 0; //clear
+
       // Convert from BGR to HSV colorspace
       cvtColor(frame, frame_HSV, COLOR_BGR2HSV);
       // Detect the object based on HSV Range Values
@@ -291,10 +346,19 @@ int main(int argc, char** argv) {
       // blur( frame_gray, frame_gray, Size(3,3) );
 
       findSquares(frame_threshold_pink, pinkSquares);
-      finalFramePink = drawSquares(frame_threshold_pink, pinkSquares, 0);
+      finalFramePink = drawSquares(frame_threshold_pink, pinkSquares, 0, carResult);
 
       findSquares(frame_threshold_yellow, yellowSquares);
-      finalFrameYellow = drawSquares(frame_threshold_yellow, yellowSquares, 1);
+      finalFrameYellow = drawSquares(frame_threshold_yellow, yellowSquares, 1, carResult);
+
+      if (carResult[0] < 0) { // slow down if speed is lower than 0
+         speeddown.speed(carResult[0]);
+         od4.send(speeddown);
+      }
+      else if (carResult[0] > 0) {
+         speedup.speedup(carResult[0]);
+         od4.send(speedup);
+      }
 
       countCars(finalFramePink, pinkSquares);
 
