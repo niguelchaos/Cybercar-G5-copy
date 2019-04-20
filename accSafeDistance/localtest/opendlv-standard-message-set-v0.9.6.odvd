@@ -376,3 +376,11 @@ message SpeedUp [id = 2001] {
 message SpeedDown [id = 2002] {
    float speed [id = 1];
 }
+
+message MoveRight [id = 2003] {
+   float angle [id = 1];
+}
+
+message MoveLeft [id = 2004] {
+   float angle [id = 1];
+}
