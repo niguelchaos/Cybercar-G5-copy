@@ -18,11 +18,6 @@
  // parts of Code copied from https://github.com/opencv/opencv/blob/master/samples/cpp/squares.cpp
  // https://docs.opencv.org/3.1.0/d2/d0a/tutorial_introduction_to_tracker.html
 
- // The "Square Detector" program.
- // It loads several images sequentially and tries to find squares in
- // each image
-
-
 #include "cluon-complete.hpp"
 #include "opendlv-standard-message-set.hpp"
 
@@ -31,7 +26,6 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include "opencv2/imgcodecs.hpp"
 #include "opencv2/objdetect/objdetect.hpp"
-// #include <opencv2/tracking.hpp>
 
 #include <cstdint>
 #include <iostream>
@@ -85,11 +79,11 @@ int32_t main(int32_t argc, char **argv) {
              Mat frame_gray;
              Mat cropped_frame;
              Mat frame_threshold_pink;
-             Mat frame_threshold_yellow;
+             Mat frame_threshold_green;
              Mat finalFramePink;
-             Mat finalFrameYellow;
+             Mat finalFrameGreen;
              vector<vector<Point> > pinkSquares;
-             vector<vector<Point> > yellowSquares;
+             vector<vector<Point> > greenSquares;
 
              const int max_value_H = 360/2;
              const int max_value = 255;
@@ -125,12 +119,12 @@ int32_t main(int32_t argc, char **argv) {
                int high_V_pink = max_value;
 
             // Green
-               int low_H_yellow = 42;
-               int low_S_yellow = 18;
-               int low_V_yellow = 102;
-               int high_H_yellow = 92;
-               int high_S_yellow = 182;
-               int high_V_yellow = 255;
+               int low_H_green = 42;
+               int low_S_green = 18;
+               int low_V_green = 102;
+               int high_H_green = 92;
+               int high_S_green = 182;
+               int high_V_green = 255;
 
             frame(Rect(Point(0, 150), Point(640, 370))).copyTo(cropped_frame);
 
@@ -138,25 +132,18 @@ int32_t main(int32_t argc, char **argv) {
             cvtColor(cropped_frame, frame_HSV, COLOR_RGB2HSV);
             // Detect the object based on HSV Range Values
             inRange(frame_HSV, Scalar(low_H_pink, low_S_pink, low_V_pink), Scalar(high_H_pink, high_S_pink, high_V_pink), frame_threshold_pink);
-            inRange(frame_HSV, Scalar(low_H_yellow, low_S_yellow, low_V_yellow), Scalar(high_H_yellow, high_S_yellow, high_V_yellow), frame_threshold_yellow);
+            inRange(frame_HSV, Scalar(low_H_green, low_S_green, low_V_green), Scalar(high_H_green, high_S_green, high_V_green), frame_threshold_green);
 
             findSquares(frame_threshold_pink, pinkSquares);
             finalFramePink = drawSquares(frame_threshold_pink, pinkSquares, 1, &od4);
 
-            findSquares(frame_threshold_yellow, yellowSquares);
-            finalFrameYellow = drawSquares(frame_threshold_yellow, yellowSquares, 1, &od4);
-
-            // countCars(finalFramePink, pinkSquares);
-
-            std::this_thread::sleep_for (std::chrono::milliseconds(50));
-            // show image with the tracked object
-             // Example: Draw a red rectangle and display image.
-             // cv::rectangle(img, cv::Point(50, 50), cv::Point(100, 100), cv::Scalar(0,0,255));
+            findSquares(frame_threshold_green, greenSquares);
+            finalFrameGreen = drawSquares(frame_threshold_green, greenSquares, 1, &od4);
 
              // Display image.
             if (VERBOSE) {
                imshow("Pink", finalFramePink);
-               imshow("Yellow", finalFrameYellow);
+               imshow("Green", finalFrameGreen);
                  cv::waitKey(1);
               }
          }
@@ -178,23 +165,6 @@ static double angle(cv::Point pt1, cv::Point pt2, cv::Point pt0) {
     return (dx1*dx2 + dy1*dy2)/sqrt((dx1*dx1 + dy1*dy1)*(dx2*dx2 + dy2*dy2) + 1e-10);
 }
 
-/**
- * Helper function to display text in the center of a contour
- */
-// void setLabel(cv::Mat& im, const std::string label, std::vector& contour) {
-//     int fontface = cv::FONT_HERSHEY_SIMPLEX;
-//     double scale = 0.4;
-//     int thickness = 1;
-//     int baseline = 0;
-//
-//     cv::Size text = cv::getTextSize(label, fontface, scale, thickness, &baseline);
-//     cv::Rect r = cv::boundingRect(contour);
-//
-//     cv::Point pt(r.x + ((r.width - text.width) / 2), r.y + ((r.height + text.height) / 2));
-//     cv::rectangle(im, pt + cv::Point(0, baseline), pt + cv::Point(text.width, -text.height), CV_RGB(255,255,255), CV_FILLED);
-//     cv::putText(im, label, pt, fontface, scale, CV_RGB(0,0,0), thickness, 8);
-// }
-
 // returns sequence of squares detected on the image.
 static void findSquares( const Mat& image, vector<vector<Point> >& squares )
 {
@@ -204,84 +174,83 @@ static void findSquares( const Mat& image, vector<vector<Point> >& squares )
     Mat pyr, timg, gray0(image.size(), CV_8U), gray;
 
     // down-scale and upscale the image to filter out the noise
+    // blur works too.
     pyrDown(image, pyr, Size(image.cols/2, image.rows/2));
     pyrUp(pyr, timg, image.size());
     vector<vector<Point> > contours;
 
+   // find squares in every color plane of the image
+   for( int c = 0; c < 1; c++ )
+   {
+      int ch[] = {c, 0};
+      mixChannels(&timg, 1, &gray0, 1, ch, 1);
+
+     // try several threshold levels
+     for( int l = 0; l < N; l++ )
+     {
+         // hack: use Canny instead of zero threshold level.
+         // Canny helps to catch squares with gradient shading
+         if( l == 0 )
+         {
+             // apply Canny. Take the upper threshold from slider
+             // and set the lower to 0 (which forces edges merging)
+             Canny(gray0, gray, 0, thresh, 5);
+             // dilate canny output to remove potential
+             // holes between edge segments
+             dilate(gray, gray, Mat(), Point(-1,-1));
+         }
+         else
+         {
+             // apply threshold if l!=0:
+             //     tgray(x,y) = gray(x,y) < (l+1)*255/N ? 255 : 0
+             // 255 is max saturation/value. N is just a thresh level.
+             gray = gray0 >= (l+1)*255/N;
+         }
+
+         // find contours and store them all as a list
+         findContours(gray, contours, RETR_LIST, CHAIN_APPROX_SIMPLE);
+
+         vector<Point> approx;
+
+         // test each contour
+         for( size_t i = 0; i < contours.size(); i++ )
+         {
+             // approximate contour with accuracy proportional
+             // to the contour perimeter
+             approxPolyDP(contours[i], approx, arcLength(contours[i], true)*0.02, true);
+
+             // square contours should have 4 vertices after approximation
+             // relatively large area (to filter out noisy contours)
+             // and be convex.
+             // Note: absolute value (fabs) of an area is used because
+             // area may be positive or negative - in accordance with the
+             // contour orientation
+            if( approx.size() == 4 &&
+            fabs(contourArea(approx)) > 1000 &&
+            fabs(contourArea(approx)) < 200000 &&
+            isContourConvex(approx) ) {
 
 
-    // find squares in every color plane of the image
-    for( int c = 0; c < 1; c++ )
-    {
-        int ch[] = {c, 0};
-        mixChannels(&timg, 1, &gray0, 1, ch, 1);
-
-        // try several threshold levels
-        for( int l = 0; l < N; l++ )
-        {
-            // hack: use Canny instead of zero threshold level.
-            // Canny helps to catch squares with gradient shading
-            if( l == 0 )
+            double maxCosine = 0;
+            // double area = contourArea(approx);
+            for( int j = 2; j < 5; j++ )
             {
-                // apply Canny. Take the upper threshold from slider
-                // and set the lower to 0 (which forces edges merging)
-                Canny(gray0, gray, 0, thresh, 5);
-                // dilate canny output to remove potential
-                // holes between edge segments
-                dilate(gray, gray, Mat(), Point(-1,-1));
-            }
-            else
-            {
-                // apply threshold if l!=0:
-                //     tgray(x,y) = gray(x,y) < (l+1)*255/N ? 255 : 0
-                gray = gray0 >= (l+1)*255/N;
+               // find the maximum cosine of the angle between joint edges
+               double cosine = fabs(angle(approx[j%4], approx[j-2], approx[j-1]));
+               maxCosine = MAX(maxCosine, cosine);
             }
 
-            // find contours and store them all as a list
-            findContours(gray, contours, RETR_LIST, CHAIN_APPROX_SIMPLE);
-
-            vector<Point> approx;
-
-            // test each contour
-            for( size_t i = 0; i < contours.size(); i++ )
-            {
-                // approximate contour with accuracy proportional
-                // to the contour perimeter
-                approxPolyDP(contours[i], approx, arcLength(contours[i], true)*0.02, true);
-
-                // square contours should have 4 vertices after approximation
-                // relatively large area (to filter out noisy contours)
-                // and be convex.
-                // Note: absolute value (fabs) of an area is used because
-                // area may be positive or negative - in accordance with the
-                // contour orientation
-               if( approx.size() == 4 &&
-               fabs(contourArea(approx)) > 1000 &&
-               fabs(contourArea(approx)) < 200000 &&
-               isContourConvex(approx) ) {
-
-
-               double maxCosine = 0;
-               // double area = contourArea(approx);
-               for( int j = 2; j < 5; j++ )
-               {
-                  // find the maximum cosine of the angle between joint edges
-                  double cosine = fabs(angle(approx[j%4], approx[j-2], approx[j-1]));
-                  maxCosine = MAX(maxCosine, cosine);
-               }
-
-               // if cosines of all angles are small
-               // (all angles are ~90 degree) then write quandrange
-               // vertices to resultant sequence
-               if( maxCosine < 0.25 ) {
-                  // cout << "Is rectangle. \n";
-                  squares.push_back(approx);
-               }
-
-               }
+            // if cosines of all angles are small
+            // (all angles are ~90 degree) then write quandrange (square)
+            // vertices to resultant sequence
+            if( maxCosine < 0.25 ) {
+               // cout << "Is rectangle. \n";
+               squares.push_back(approx);
             }
-        }
-    }
+            }
+         }
+      }
+   }
 }
 
 void checkCarDistance(double area, OD4Session *od4) {
@@ -345,7 +314,6 @@ void checkCarDistance(double area, OD4Session *od4) {
    /////////////////////////////////////////////////////////////////////
 
    /////////////////////// PID controller ///////////////////////
-
    speed_correction.amount(correction_speed);
    od4->send(speed_correction);
 }
@@ -386,20 +354,20 @@ void checkCarPosition(double centerX, OD4Session *od4) {
       cout << "    <<<< car going hard left \n  ";
       move_left.angle(hard_left);
    }
-   if (centerX < frame_center - offset) {
+   else if (centerX < frame_center - offset) {
       cout << "      << car going left \n  ";
       move_left.angle(left);
    }
-   if (centerX >= frame_center - offset && centerX < frame_center + offset) {
+   else if (centerX >= frame_center - offset && centerX < frame_center + offset) {
       cout << "      || car in front || \n  ";
       move_left.angle(0);
       move_right.angle(0);
    }
-   if (centerX >= frame_center + offset) {
+   else if (centerX >= frame_center + offset) {
       cout << "      car going right >> \n";
       move_right.angle(right);
    }
-   if (centerX >= frame_center + hard_offset) {
+   else if (centerX >= frame_center + hard_offset) {
       cout << "      car going hard right >>>> \n";
       move_right.angle(hard_right);
    }
@@ -408,13 +376,12 @@ void checkCarPosition(double centerX, OD4Session *od4) {
    ///////////////////////////////////////////////////////
 
    /////////////////////////// PID Controller test ////////////////////////////
-
    steering_correction.amount(correction_angle);
    od4->send(steering_correction);
 }
 
 // the function draws all the squares in the image
-static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int followcar, OD4Session *od4) // 0 = pink/other car, 1 = yellow/acc car
+static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int followcar, OD4Session *od4) // 0 = pink/other car, 1 = green/acc car
 {
    Scalar color = Scalar(255,0,0 );
    vector<Rect> boundRects( squares.size() );
@@ -422,53 +389,39 @@ static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int f
    int group_thresh = 1;
    double merge_box_diff = 0.6;
 
-    for( size_t i = 0; i < squares.size(); i++ )
-    {
-        // const Point* p = &squares[i][0];
-        // int n = (int)squares[i].size();
-        // polylines(image, &p, &n, 1, true, Scalar(0,255,0), 3, LINE_AA);
-
-        // Code from http://answers.opencv.org/question/72237/measuring-width-height-of-bounding-box/
+   for( size_t i = 0; i < squares.size(); i++ )
+   {
+      // Code from http://answers.opencv.org/question/72237/measuring-width-height-of-bounding-box/
       boundRects[i] = boundingRect(squares[i]);
       rectangle(image, boundRects[i].tl(), boundRects[i].br(), color, 2 );
 
-        // Make sure that the Rect is filled in any possible way
-        int rect_x = boundRects[i].x;
-        int rect_y = boundRects[i].y;
-        int rect_width = boundRects[i].width;
-        int rect_height = boundRects[i].height;
-        double rect_area = boundRects[i].area();
-        // Point2d center = boundRects[i].tl() + 0.5 * Point2d(boundRects[i].size()); //tl = top left, br = bot right
+      int rect_x = boundRects[i].x;
+      int rect_y = boundRects[i].y;
+      int rect_width = boundRects[i].width;
+      int rect_height = boundRects[i].height;
+      double rect_area = boundRects[i].area();
 
-        double rect_centerX = rect_x + 0.5 * rect_width;
-        double rect_centerY = rect_y + 0.5 * rect_height;
+      double rect_centerX = rect_x + 0.5 * rect_width;
+      double rect_centerY = rect_y + 0.5 * rect_height;
 
-        // Now with those parameters you can calculate the 4 points
-        Point top_left(rect_x,rect_y);
-        Point top_right(rect_x + rect_width, rect_y);
-        Point bot_left(rect_x, rect_y + rect_height);
-        Point bot_right(rect_x + rect_width, rect_y + rect_height);
+      // Now with those parameters you can calculate the 4 points
+      Point top_left(rect_x,rect_y);
+      Point top_right(rect_x + rect_width, rect_y);
+      Point bot_left(rect_x, rect_y + rect_height);
+      Point bot_right(rect_x + rect_width, rect_y + rect_height);
 
-
-        if (followcar == 1) { // Yellow = if car is the one we are following, check position and distance
-           checkCarDistance(rect_area, od4);
-           checkCarPosition(rect_centerX, od4);
-        }
-        // else if (followcar == 0) {
-
-        // }
-
-        // cout << "rect_x:     " << rect_x << "\n";
-        // cout << "rect_y:     " << rect_y << "\n";
-        // cout << "rect_width:       " << rect_width << "\n";
-        // cout << "rect_height:      " << rect_height << "\n";
-        // cout << "area:       " << rect_area << "\n";
-
+      // we want the highest resolution possible for detecting acc car's position.
+      if (followcar == 1) { // 1 = if car is the one we are following, check position and distance
+        checkCarDistance(rect_area, od4);
+        checkCarPosition(rect_centerX, od4);
+      }
    }
-   cout << "before: " << boundRects.size();
-   groupRectangles(boundRects, group_thresh, merge_box_diff);  //group overlapping rectangles into 1
-   cout << "         after: " << boundRects.size() << "\n";
 
+   if (followcar == 0) { // if not, they are other cars.
+      // only merge when all bounding boxes have been created.
+   }
+   // temporarily here to group no matter what color
+   groupRectangles(boundRects, group_thresh, merge_box_diff);  //group overlapping rectangles into 1
    countCars(image, boundRects);
    return image;
 }
@@ -477,13 +430,12 @@ void countCars(Mat frame, vector<Rect>& rects) {
    int rect_num =  rects.size();
    std::string car_count = std::to_string(rect_num);
    if (rect_num == 0) {
-      cout << "No cars \n";
+      // cout << "No cars \n";
    }
    else if (rect_num == 1) {
-      cout << "      [  " << car_count << " car. ]  \n";
+      cout << "               [  " << car_count << " car. ]  \n \n";
    } else {
-         cout << "      [  " << car_count << " cars. ]  \n";
+         cout << "            [  " << car_count << " cars. ]  \n \n";
    }
    putText(frame, car_count, Point(5,100), FONT_HERSHEY_DUPLEX, 1, Scalar(255,255,255), 2);
-
 }
