@@ -11,6 +11,7 @@
 #include "opencv2/highgui.hpp"
 // #include <opencv2/tracking.hpp>
 #include <opencv2/videoio.hpp>
+#include "opencv2/objdetect/objdetect.hpp"
 #include <opencv2/dnn.hpp>
 #include <cstring>
 
@@ -187,12 +188,25 @@ double checkCarPosition(double centerX, int frame_center, int offset) {
    return position;
 }
 
+void countCars(Mat frame, vector<Rect >& squares) {
+   int squareNum =  squares.size();
+   std::string carcount = std::to_string(squareNum);
+   // cout << "Detected      " << carcount << "cars. "<<"\n";
+   putText(frame, carcount, Point(5,100), FONT_HERSHEY_DUPLEX, 1, Scalar(255,255,255), 2);
+
+}
+
 // the function draws all the squares in the image
 Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int followcar, double *carResult ) // 0 = pink/other car, 1 = yellow/acc car
 {
    int returnmsg; // -1 = speed down, 0 = nothing, 1 = speedup
     Scalar color = Scalar(255,0,0 );
     vector<Rect> boundRect( squares.size() );
+
+    int group_thresh = 1;
+   double merge_box_diff = 0.6; // how much rectangles have to overlap to merge
+
+   cout << "before: " << boundRect.size();
 
     // for each square...
     for( size_t i = 0; i < squares.size(); i++ )
@@ -240,6 +254,7 @@ Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int followca
 
 
 
+
          // cout << "rect_x:     " << rect_x << "\n";
          // cout << "rect_y:     " << rect_y << "\n";
          // cout << "rect_width:       " << rect_width << "\n";
@@ -247,19 +262,13 @@ Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int followca
          // cout << "area:       " << rect_area << "\n";
 
     }
+    groupRectangles(boundRect, group_thresh, merge_box_diff);  //group overlapping rectangles
+   cout << "         after: " << boundRect.size() << "\n";
+   countCars(image, boundRect);
 
    return image;
 }
 
-
-
-void countCars(Mat frame, vector<vector<Point> >& squares) {
-   int squareNum =  squares.size();
-   std::string carcount = std::to_string(squareNum);
-   // cout << "Detected      " << carcount << "cars. "<<"\n";
-   putText(frame, carcount, Point(5,100), FONT_HERSHEY_DUPLEX, 1, Scalar(255,255,255), 2);
-
-}
 
 int main(int argc, char** argv) {
 
@@ -277,9 +286,9 @@ int main(int argc, char** argv) {
    const int max_value = 255;
 
 // Pink
-   int low_H_pink = 130;
-   int low_S_pink = 55;
-   int low_V_pink = 180;
+   int low_H_pink = 120;
+   int low_S_pink = 10;
+   int low_V_pink = 30;
    int high_H_pink = max_value_H;
    int high_S_pink = max_value;
    int high_V_pink = max_value;
@@ -328,7 +337,7 @@ int main(int argc, char** argv) {
      helloworld.helloworld("Hello world aaaaaaaaaa");
      od4.send(helloworld);
 
-     opendlv::logic::SpeedUp speedup;
+     SpeedUp speedup;
      SpeedDown speeddown;
      double carResult[2]; // slot 0 = distance, 1 = position
 
@@ -356,11 +365,10 @@ int main(int argc, char** argv) {
          od4.send(speeddown);
       }
       else if (carResult[0] > 0) {
-         speedup.speedup(carResult[0]);
+         speedup.speed(carResult[0]);
          od4.send(speedup);
       }
 
-      countCars(finalFramePink, pinkSquares);
 
       // show image with the tracked object
       imshow("Pink", finalFramePink);
