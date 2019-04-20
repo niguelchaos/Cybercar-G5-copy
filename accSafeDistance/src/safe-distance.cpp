@@ -109,15 +109,15 @@ int32_t main(int32_t argc, char **argv) {
              sharedMemory->unlock();
 
              // TODO: Do something with the frame.
-             HelloWorld helloworld;
-             helloworld.helloworld("Hello world aaaaaaaaaa");
-             od4.send(helloworld);
-             cout << "sent helloworld" <<"\n";
+             // HelloWorld helloworld;
+             // helloworld.helloworld("Hello world from camera safe distance checker gweh");
+             // od4.send(helloworld);
+             // cout << "sent helloworld" <<"\n";
 
              // Pink
                int low_H_pink = 130;
-               int low_S_pink = 55;
-               int low_V_pink = 100;
+               int low_S_pink = 30;
+               int low_V_pink = 60;
                int high_H_pink = max_value_H;
                int high_S_pink = max_value;
                int high_V_pink = max_value;
@@ -130,7 +130,7 @@ int32_t main(int32_t argc, char **argv) {
                int high_S_yellow = 182;
                int high_V_yellow = 255;
 
-            frame(Rect(Point(100, 150), Point(580, 400))).copyTo(cropped_frame);
+            frame(Rect(Point(0, 150), Point(640, 370))).copyTo(cropped_frame);
 
             // Convert from BGR to HSV colorspace
             cvtColor(cropped_frame, frame_HSV, COLOR_RGB2HSV);
@@ -139,22 +139,22 @@ int32_t main(int32_t argc, char **argv) {
             inRange(frame_HSV, Scalar(low_H_yellow, low_S_yellow, low_V_yellow), Scalar(high_H_yellow, high_S_yellow, high_V_yellow), frame_threshold_yellow);
 
             findSquares(frame_threshold_pink, pinkSquares);
-            finalFramePink = drawSquares(frame_threshold_pink, pinkSquares, 0, &od4);
+            finalFramePink = drawSquares(frame_threshold_pink, pinkSquares, 1, &od4);
 
             findSquares(frame_threshold_yellow, yellowSquares);
             finalFrameYellow = drawSquares(frame_threshold_yellow, yellowSquares, 1, &od4);
 
             countCars(finalFramePink, pinkSquares);
 
-
+            std::this_thread::sleep_for (std::chrono::milliseconds(50));
             // show image with the tracked object
              // Example: Draw a red rectangle and display image.
              // cv::rectangle(img, cv::Point(50, 50), cv::Point(100, 100), cv::Scalar(0,0,255));
 
              // Display image.
             if (VERBOSE) {
-               // imshow("Pink", finalFramePink);
-               // imshow("Yellow", finalFrameYellow);
+               imshow("Pink", finalFramePink);
+               imshow("Yellow", finalFrameYellow);
                  cv::waitKey(1);
               }
          }
@@ -287,47 +287,69 @@ void checkCarDistance(double area, OD4Session *od4) {
    float soft_accel = 0.005f;
    float soft_brake = -0.005f;
    float hard_brake = -0.01f;
-   float instant_stop = 5f;
+   float instant_stop = 5;
 
-   if (area < 10000) {
+// PID controller test
+// https://robotics.stackexchange.com/questions/9786/how-do-the-pid-parameters-kp-ki-and-kd-affect-the-heading-of-a-differential
+   SpeedCorrection speed_correction;
+
+   float optimal_area = 25000;
+   float time_interval = 0.05f;
+   float error = optimal_area - (float) area;
+   float kp = 1.1f; // proportional gain constant, tunes controller.
+   // float ki = 1.1;
+   // float kd = 1;
+   // float integral += error * time_interval // integral estimates future error.
+   // float derivative = (error - prev_error) / time_interval // looks at past error values
+   // prev_error = error;
+   float output = kp * error; // Ki * integral + Kd * derivative
+   float correction_speed = output / 1000000; // pedal only accepts 0 - 1, need to modify correction to suit it.
+
+///////////////////////////// hard coded speed correction ///////////////////////
+   cout << " [[ area: " << area << " ]] \n";
+   cout << "           [ speed correction : " << correction_speed << " ]\n";
+
+   if (area < 5000) {
       cout << "Too far away. Speed up. \n";
-      speedup.speed(hard_accel);
-      od4->send(speedup);
+      speed_up.speed(hard_accel);
    }
-   if (area >= 10000 && area < 20000) {
+   if (area >= 5000 && area < 10000) {
       cout << "Catching up. Begin matching speed. \n";
-      speedup.speed(soft_accel);
-      od4->send(speed_up);
+      speed_up.speed(soft_accel);
    }
-   if (area >= 20000 && area < 30000) {
+   if (area >= 10000 && area < 15000) {
       // cout << "length: " << length << "\n";
       cout << "Optimal. Match Speed. \n";
-      speedup.speed(0);
-      speeddown.speed(0);
-      od4->send(speed_up);
-      od4->send(speed_down);
+      speed_up.speed(0);
+      speed_down.speed(0);
    }
-   if (area >= 30000 && area < 50000) {
+   if (area >= 15000 && area < 25000) {
       cout << "Slow down. Nearing Car. \n";
-      speeddown.speed(soft_brake);
-      od4->send(speed_down);
+      speed_down.speed(soft_brake);
    }
-   if (area >= 50000 && area < 60000) {
+   if (area >= 25000 && area < 35000) {
       cout << "Brake Hard. Almost crashing. \n";
-      speeddown.speed(hard_brake);
-      od4->send(speed_down);
+      speed_down.speed(hard_brake); // will go backwards if car already stopped
    }
-   if (area >= 60000) {
+   if (area >= 35000) {
       cout << "Stop. Probably already crashed. \n";
-      speeddown.speed(instant_stop); // 5 would be the code to stop. if simply added as pedal, car would immediately go backwards full speed.
-      od4->send(speed_down); //might need new message
+      speed_down.speed(instant_stop); // 5 would be the code to stop. if simply added as pedal, car would immediately go backwards full speed.
+      //might need new message, or just use pid controller
    }
+   od4->send(speed_up);
+   od4->send(speed_down);
+   /////////////////////////////////////////////////////////////////////
+
+   /////////////////////// PID controller ///////////////////////
+
+   speed_correction.amount(correction_speed);
+   od4->send(speed_correction);
 }
 
 void checkCarPosition(double centerX, OD4Session *od4) {
-   int frame_center = 240;
-   int offset = 20;
-   int hard_offset = 2 * offset;
+   int frame_center = 320;
+   int offset = 60;
+   int hard_offset = 2.5 * offset;
 
    MoveRight move_right;
    MoveLeft move_left;
@@ -338,36 +360,53 @@ void checkCarPosition(double centerX, OD4Session *od4) {
    float right = -0.25f;
    float hard_right = -0.5f;
 
-   cout << "center X:       " << centerX << "\n";
+// PID controller test
+// https://robotics.stackexchange.com/questions/9786/how-do-the-pid-parameters-kp-ki-and-kd-affect-the-heading-of-a-differential
+   SteeringCorrection steering_correction;
+   float time_interval = 0.05f;
+   float error = frame_center - (float) centerX;
+   float kp = 1.1f; // proportional gain constant, tunes controller.
+   // float ki = 1.1;
+   // float kd = 1;
+   // float integral += error * time_interval // integral estimates future error.
+   // float derivative = (error - prev_error) / time_interval // looks at past error values
+   // prev_error = error;
+   float output = kp * error; // Ki * integral + Kd * derivative
+   float correction_angle = output / 1000; // because groundsteering accepts 0 - 1
+
+//////////////////////// hard coded corrections ///////////////////
+   cout << "center X:       " << centerX << "           ";
+   cout << "[steering correction: " << correction_angle << "]\n";
 
    if (centerX < frame_center - hard_offset) {
       cout << "    <<<< car going hard left \n  ";
       move_left.angle(hard_left);
-      od4->send(move_left);
    }
    if (centerX < frame_center - offset) {
       cout << "      << car going left \n  ";
       move_left.angle(left);
-      od4->send(move_left);
    }
    if (centerX >= frame_center - offset && centerX < frame_center + offset) {
       cout << "      || car in front || \n  ";
-
       move_left.angle(0);
       move_right.angle(0);
-      od4->send(move_left);
-      od4->send(move_right);
    }
    if (centerX >= frame_center + offset) {
       cout << "      car going right >> \n";
       move_right.angle(right);
-      od4->send(move_right);
    }
    if (centerX >= frame_center + hard_offset) {
       cout << "      car going hard right >>>> \n";
       move_right.angle(hard_right);
-      od4->send(move_right);
    }
+   od4->send(move_left);
+   od4->send(move_right);
+   ///////////////////////////////////////////////////////
+
+   /////////////////////////// PID Controller test ////////////////////////////
+
+   steering_correction.amount(correction_angle);
+   od4->send(steering_correction);
 }
 
 // the function draws all the squares in the image
@@ -422,7 +461,7 @@ static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int f
 void countCars(Mat frame, vector<vector<Point> >& squares) {
    int squareNum =  squares.size();
    std::string carcount = std::to_string(squareNum);
-   cout << "Detected      " << carcount << "cars. "<<"\n";
+   // cout << "Detected      " << carcount << "cars. "<<"\n";
    putText(frame, carcount, Point(5,100), FONT_HERSHEY_DUPLEX, 1, Scalar(255,255,255), 2);
 
 }
