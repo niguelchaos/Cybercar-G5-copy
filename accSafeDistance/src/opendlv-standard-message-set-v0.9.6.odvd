@@ -384,3 +384,11 @@ message MoveRight [id = 2003] {
 message MoveLeft [id = 2004] {
    float angle [id = 1];
 }
+
+message SteeringCorrection [id = 2005] {
+   float amount [id = 1];
+}
+
+message SpeedCorrection [id = 2006] {
+   float amount [id = 1];
+}
