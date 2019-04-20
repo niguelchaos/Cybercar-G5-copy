@@ -30,6 +30,7 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include "opencv2/imgcodecs.hpp"
+#include "opencv2/objdetect/objdetect.hpp"
 // #include <opencv2/tracking.hpp>
 
 #include <cstdint>
@@ -44,7 +45,7 @@ using namespace cluon;
 static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int followcar, OD4Session *od4 );
 static void findSquares( const Mat& image, vector<vector<Point> >& squares );
 static double angle( Point pt1, Point pt2, Point pt0 );
-void countCars(Mat frame, vector<vector<Point> >& squares);
+void countCars(Mat frame, vector<Rect>& rects);
 void checkCarPosition(double centerX, OD4Session *od4) ;
 void checkCarDistance(double area, OD4Session *od4);
 
@@ -92,6 +93,7 @@ int32_t main(int32_t argc, char **argv) {
 
              const int max_value_H = 360/2;
              const int max_value = 255;
+
              // Wait for a notification of a new frame.
              sharedMemory->wait();
 
@@ -115,9 +117,9 @@ int32_t main(int32_t argc, char **argv) {
              // cout << "sent helloworld" <<"\n";
 
              // Pink
-               int low_H_pink = 130;
-               int low_S_pink = 30;
-               int low_V_pink = 60;
+               int low_H_pink = 135;
+               int low_S_pink = 50;
+               int low_V_pink = 70;
                int high_H_pink = max_value_H;
                int high_S_pink = max_value;
                int high_V_pink = max_value;
@@ -144,7 +146,7 @@ int32_t main(int32_t argc, char **argv) {
             findSquares(frame_threshold_yellow, yellowSquares);
             finalFrameYellow = drawSquares(frame_threshold_yellow, yellowSquares, 1, &od4);
 
-            countCars(finalFramePink, pinkSquares);
+            // countCars(finalFramePink, pinkSquares);
 
             std::this_thread::sleep_for (std::chrono::milliseconds(50));
             // show image with the tracked object
@@ -205,6 +207,8 @@ static void findSquares( const Mat& image, vector<vector<Point> >& squares )
     pyrDown(image, pyr, Size(image.cols/2, image.rows/2));
     pyrUp(pyr, timg, image.size());
     vector<vector<Point> > contours;
+
+
 
     // find squares in every color plane of the image
     for( int c = 0; c < 1; c++ )
@@ -306,7 +310,7 @@ void checkCarDistance(double area, OD4Session *od4) {
    float correction_speed = output / 1000000; // pedal only accepts 0 - 1, need to modify correction to suit it.
 
 ///////////////////////////// hard coded speed correction ///////////////////////
-   cout << " [[ area: " << area << " ]] \n";
+   cout << " [[ area: " << area << " ]]";
    cout << "           [ speed correction : " << correction_speed << " ]\n";
 
    if (area < 5000) {
@@ -348,8 +352,8 @@ void checkCarDistance(double area, OD4Session *od4) {
 
 void checkCarPosition(double centerX, OD4Session *od4) {
    int frame_center = 320;
-   int offset = 60;
-   int hard_offset = 2.5 * offset;
+   float offset = 60;
+   float hard_offset = 2.5f * offset;
 
    MoveRight move_right;
    MoveLeft move_left;
@@ -413,25 +417,28 @@ void checkCarPosition(double centerX, OD4Session *od4) {
 static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int followcar, OD4Session *od4) // 0 = pink/other car, 1 = yellow/acc car
 {
    Scalar color = Scalar(255,0,0 );
-   vector<Rect> boundRect( squares.size() );
+   vector<Rect> boundRects( squares.size() );
+
+   int group_thresh = 1;
+   double merge_box_diff = 0.6;
 
     for( size_t i = 0; i < squares.size(); i++ )
     {
-        const Point* p = &squares[i][0];
-        int n = (int)squares[i].size();
-        polylines(image, &p, &n, 1, true, Scalar(0,255,0), 3, LINE_AA);
+        // const Point* p = &squares[i][0];
+        // int n = (int)squares[i].size();
+        // polylines(image, &p, &n, 1, true, Scalar(0,255,0), 3, LINE_AA);
 
         // Code from http://answers.opencv.org/question/72237/measuring-width-height-of-bounding-box/
-      boundRect[i] = boundingRect(squares[i]);
-      rectangle(image, boundRect[i].tl(), boundRect[i].br(), color, 2 );
+      boundRects[i] = boundingRect(squares[i]);
+      rectangle(image, boundRects[i].tl(), boundRects[i].br(), color, 2 );
 
         // Make sure that the Rect is filled in any possible way
-        int rect_x = boundRect[i].x;
-        int rect_y = boundRect[i].y;
-        int rect_width = boundRect[i].width;
-        int rect_height = boundRect[i].height;
-        double rect_area = boundRect[i].area();
-        // Point2d center = boundRect[i].tl() + 0.5 * Point2d(boundRect[i].size()); //tl = top left, br = bot right
+        int rect_x = boundRects[i].x;
+        int rect_y = boundRects[i].y;
+        int rect_width = boundRects[i].width;
+        int rect_height = boundRects[i].height;
+        double rect_area = boundRects[i].area();
+        // Point2d center = boundRects[i].tl() + 0.5 * Point2d(boundRects[i].size()); //tl = top left, br = bot right
 
         double rect_centerX = rect_x + 0.5 * rect_width;
         double rect_centerY = rect_y + 0.5 * rect_height;
@@ -442,10 +449,14 @@ static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int f
         Point bot_left(rect_x, rect_y + rect_height);
         Point bot_right(rect_x + rect_width, rect_y + rect_height);
 
+
         if (followcar == 1) { // Yellow = if car is the one we are following, check position and distance
            checkCarDistance(rect_area, od4);
            checkCarPosition(rect_centerX, od4);
         }
+        // else if (followcar == 0) {
+
+        // }
 
         // cout << "rect_x:     " << rect_x << "\n";
         // cout << "rect_y:     " << rect_y << "\n";
@@ -453,15 +464,26 @@ static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int f
         // cout << "rect_height:      " << rect_height << "\n";
         // cout << "area:       " << rect_area << "\n";
 
-    }
+   }
+   cout << "before: " << boundRects.size();
+   groupRectangles(boundRects, group_thresh, merge_box_diff);  //group overlapping rectangles into 1
+   cout << "         after: " << boundRects.size() << "\n";
 
+   countCars(image, boundRects);
    return image;
 }
 
-void countCars(Mat frame, vector<vector<Point> >& squares) {
-   int squareNum =  squares.size();
-   std::string carcount = std::to_string(squareNum);
-   // cout << "Detected      " << carcount << "cars. "<<"\n";
-   putText(frame, carcount, Point(5,100), FONT_HERSHEY_DUPLEX, 1, Scalar(255,255,255), 2);
+void countCars(Mat frame, vector<Rect>& rects) {
+   int rect_num =  rects.size();
+   std::string car_count = std::to_string(rect_num);
+   if (rect_num == 0) {
+      cout << "No cars \n";
+   }
+   else if (rect_num == 1) {
+      cout << "      [  " << car_count << " car. ]  \n";
+   } else {
+         cout << "      [  " << car_count << " cars. ]  \n";
+   }
+   putText(frame, car_count, Point(5,100), FONT_HERSHEY_DUPLEX, 1, Scalar(255,255,255), 2);
 
 }
