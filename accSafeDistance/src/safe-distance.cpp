@@ -281,40 +281,92 @@ static void findSquares( const Mat& image, vector<vector<Point> >& squares )
 }
 
 void checkCarDistance(double area, OD4Session *od4) {
-   SpeedUp speedup;
+   SpeedUp speed_up;
+   SpeedDown speed_down;
+   float hard_accel = 0.01f;
+   float soft_accel = 0.005f;
+   float soft_brake = -0.005f;
+   float hard_brake = -0.01f;
+   float instant_stop = 5f;
+
    if (area < 10000) {
       cout << "Too far away. Speed up. \n";
-      speedup.speed(0.01f);
+      speedup.speed(hard_accel);
       od4->send(speedup);
    }
-   if (area >= 10000 && area < 30000) {
+   if (area >= 10000 && area < 20000) {
       cout << "Catching up. Begin matching speed. \n";
-      speedup.speed(0.005f);
-      od4->send(speedup);
+      speedup.speed(soft_accel);
+      od4->send(speed_up);
    }
-   if (area >= 30000 && area < 40000) {
+   if (area >= 20000 && area < 30000) {
       // cout << "length: " << length << "\n";
       cout << "Optimal. Match Speed. \n";
+      speedup.speed(0);
+      speeddown.speed(0);
+      od4->send(speed_up);
+      od4->send(speed_down);
    }
-   if (area >= 40000 && area < 60000) {
-      cout << "Slow down. Almost crashing. \n";
+   if (area >= 30000 && area < 50000) {
+      cout << "Slow down. Nearing Car. \n";
+      speeddown.speed(soft_brake);
+      od4->send(speed_down);
+   }
+   if (area >= 50000 && area < 60000) {
+      cout << "Brake Hard. Almost crashing. \n";
+      speeddown.speed(hard_brake);
+      od4->send(speed_down);
    }
    if (area >= 60000) {
-      cout << "Stop. \n";
+      cout << "Stop. Probably already crashed. \n";
+      speeddown.speed(instant_stop); // 5 would be the code to stop. if simply added as pedal, car would immediately go backwards full speed.
+      od4->send(speed_down); //might need new message
    }
 }
 
-void checkCarPosition(double centerX, int frame_center, int offset, OD4Session *od4) {
+void checkCarPosition(double centerX, OD4Session *od4) {
+   int frame_center = 240;
+   int offset = 20;
+   int hard_offset = 2 * offset;
+
+   MoveRight move_right;
+   MoveLeft move_left;
+
+   // positive steer = left, negative = right
+   float hard_left = 0.5f;
+   float left = 0.25f;
+   float right = -0.25f;
+   float hard_right = -0.5f;
+
    cout << "center X:       " << centerX << "\n";
 
+   if (centerX < frame_center - hard_offset) {
+      cout << "    <<<< car going hard left \n  ";
+      move_left.angle(hard_left);
+      od4->send(move_left);
+   }
    if (centerX < frame_center - offset) {
       cout << "      << car going left \n  ";
+      move_left.angle(left);
+      od4->send(move_left);
    }
    if (centerX >= frame_center - offset && centerX < frame_center + offset) {
-      cout << "      || car in front ||\n  ";
+      cout << "      || car in front || \n  ";
+
+      move_left.angle(0);
+      move_right.angle(0);
+      od4->send(move_left);
+      od4->send(move_right);
    }
    if (centerX >= frame_center + offset) {
       cout << "      car going right >> \n";
+      move_right.angle(right);
+      od4->send(move_right);
+   }
+   if (centerX >= frame_center + hard_offset) {
+      cout << "      car going hard right >>>> \n";
+      move_right.angle(hard_right);
+      od4->send(move_right);
    }
 }
 
@@ -344,9 +396,6 @@ static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int f
 
         double rect_centerX = rect_x + 0.5 * rect_width;
         double rect_centerY = rect_y + 0.5 * rect_height;
-        int frame_center = 240;
-        int offset = 20;
-
 
         // Now with those parameters you can calculate the 4 points
         Point top_left(rect_x,rect_y);
@@ -356,7 +405,7 @@ static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int f
 
         if (followcar == 1) { // Yellow = if car is the one we are following, check position and distance
            checkCarDistance(rect_area, od4);
-           checkCarPosition(rect_centerX, frame_center, offset, od4);
+           checkCarPosition(rect_centerX, od4);
         }
 
         // cout << "rect_x:     " << rect_x << "\n";
