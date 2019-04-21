@@ -26,7 +26,10 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include "opencv2/imgcodecs.hpp"
 #include "opencv2/objdetect/objdetect.hpp"
+#include <time.h> // to calculate time needed
+#include <limits.h> // to get INT_MAX, to protect against overflow
 
+#include <ctime>
 #include <cstdint>
 #include <iostream>
 #include <memory>
@@ -72,6 +75,9 @@ int32_t main(int32_t argc, char **argv) {
             // Interface to a running OpenDaVINCI session; here, you can send and receive messages.
             cluon::OD4Session od4{static_cast<uint16_t>(std::stoi(commandlineArguments["cid"]))};
 
+            int64_t starttimestampmicro = cluon::time::toMicroseconds(cluon::time::now());
+            int64_t starttimestampsecs = starttimestampmicro / 1000000;
+            cout << "Timestamp: " << starttimestampsecs << endl;
             // Endless loop; end the program by pressing Ctrl-C.
          while (od4.isRunning()) {
              Mat frame;
@@ -87,6 +93,13 @@ int32_t main(int32_t argc, char **argv) {
 
              const int max_value_H = 360/2;
              const int max_value = 255;
+
+             // fps counter begin
+            // time_t start, end;
+
+            // double sec;
+            // double fps;
+            // fps counter end
 
              // Wait for a notification of a new frame.
              sharedMemory->wait();
@@ -104,11 +117,23 @@ int32_t main(int32_t argc, char **argv) {
              }
              sharedMemory->unlock();
 
+            // fps counter begin
+            // if (framecounter == 0){
+            //     std::time(&start);
+            // }
+
              // TODO: Do something with the frame.
              // HelloWorld helloworld;
              // helloworld.helloworld("Hello world from camera safe distance checker gweh");
              // od4.send(helloworld);
              // cout << "sent helloworld" <<"\n";
+             int64_t prevtimestampsecs;
+
+             int64_t timestampmicro = cluon::time::toMicroseconds(cluon::time::now());
+             int64_t timestampsecs = timestampmicro / 1000000;
+
+            int framecounter;
+
 
              // Pink
                int low_H_pink = 135;
@@ -125,6 +150,8 @@ int32_t main(int32_t argc, char **argv) {
                int high_H_green = 92;
                int high_S_green = 182;
                int high_V_green = 255;
+
+
 
             frame(Rect(Point(0, 150), Point(640, 370))).copyTo(cropped_frame);
 
@@ -145,7 +172,16 @@ int32_t main(int32_t argc, char **argv) {
                imshow("Pink", finalFramePink);
                imshow("Green", finalFrameGreen);
                  cv::waitKey(1);
-              }
+            }
+
+
+            framecounter++;
+            if (timestampsecs != prevtimestampsecs) {
+               cout << "Timestamp: " << timestampsecs << "          FPS: " << framecounter << endl;
+               prevtimestampsecs = timestampsecs;
+               framecounter = 0;
+            }
+
          }
       }
      retCode = 0;
@@ -395,6 +431,14 @@ static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int f
       boundRects[i] = boundingRect(squares[i]);
       rectangle(image, boundRects[i].tl(), boundRects[i].br(), color, 2 );
 
+      // we want the highest resolution possible for detecting acc car's position.
+      // Correction: ok maybe not
+   }
+
+   // temporarily here to group no matter what color
+   groupRectangles(boundRects, group_thresh, merge_box_diff);  //group overlapping rectangles into 1
+
+   for (size_t i = 0; i < boundRects.size(); i++) {
       int rect_x = boundRects[i].x;
       int rect_y = boundRects[i].y;
       int rect_width = boundRects[i].width;
@@ -410,18 +454,16 @@ static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int f
       Point bot_left(rect_x, rect_y + rect_height);
       Point bot_right(rect_x + rect_width, rect_y + rect_height);
 
-      // we want the highest resolution possible for detecting acc car's position.
+      if (followcar == 0) { // if not, they are other cars.
+         // only merge when all bounding boxes have been created.
+      }
+
       if (followcar == 1) { // 1 = if car is the one we are following, check position and distance
         checkCarDistance(rect_area, od4);
         checkCarPosition(rect_centerX, od4);
       }
    }
 
-   if (followcar == 0) { // if not, they are other cars.
-      // only merge when all bounding boxes have been created.
-   }
-   // temporarily here to group no matter what color
-   groupRectangles(boundRects, group_thresh, merge_box_diff);  //group overlapping rectangles into 1
    countCars(image, boundRects);
    return image;
 }
