@@ -376,8 +376,8 @@ message opendlv.logic.cognition.GroundSpeedLimit [id = 1192] {
   float speedLimit [id = 1];
 }
 
-message StopCarRequest[id = 2007]{
-   
+message StopSignPresenceUpdate[id = 2007]{
+   bool stopSignPresence [id = 1];
 }
 
 /*

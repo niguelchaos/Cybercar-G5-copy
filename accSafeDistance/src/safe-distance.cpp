@@ -49,8 +49,9 @@ using namespace std;
 using namespace cv;
 using namespace cluon;
 //defining variables for stop sign
-String stopSignCascadeName;
+String stopSignCascadeName = "/home/nora/gitrepos/gorup_05/SafeDistance/src";
 CascadeClassifier stopSignCascade;
+bool stopSignPresent = false;
 
 void detectAndDisplayStopSign( Mat frame, OD4Session *od4);
 
@@ -75,6 +76,7 @@ int32_t main(int32_t argc, char **argv) {
             const std::string NAME{commandlineArguments["name"]};
             const uint32_t WIDTH{static_cast<uint32_t>(std::stoi(commandlineArguments["width"]))};
             const uint32_t HEIGHT{static_cast<uint32_t>(std::stoi(commandlineArguments["height"]))};
+            //for showing outputs in the terminal, debugging information
             const bool VERBOSE{commandlineArguments.count("verbose") != 0};
             
             // Attach to the shared memory.
@@ -139,15 +141,10 @@ int32_t main(int32_t argc, char **argv) {
                     
                     // Method for detecting stop sign with haar cascade
                     detectAndDisplayStopSign(frame , &od4);
-                    
-                    //Sending messages for stop sign detection
-                     StopCarRequest stopCar;
-                     
      
                     
                     // Display image.
                     if (VERBOSE) {
-                        std::cout << "sending stop sign message: " << std::endl;
                         cv::waitKey(1); 
                         
                     }
@@ -164,7 +161,8 @@ int32_t main(int32_t argc, char **argv) {
 //Classifier gotten from : https://github.com/markgaynor/stopsigns
 void detectAndDisplayStopSign( Mat frame, OD4Session *od4)
 {
-    StopCarRequest stopCar;
+    //Sending messages for stop sign detection
+    StopSignPresenceUpdate stopSignPresenceUpdate;
     
     std::vector<Rect> stopsigns;
     Mat frame_gray;
@@ -172,17 +170,49 @@ void detectAndDisplayStopSign( Mat frame, OD4Session *od4)
     equalizeHist( frame_gray, frame_gray );
     //-- Detect stop signs
     stopSignCascade.detectMultiScale(frame_gray, stopsigns, 1.1, 2, 0|CASCADE_SCALE_IMAGE, Size(60, 60));
+    //checks if the stop sign is present in the current frame
+    //
     if (stopsigns.size() > 0){
-        od4->send(stopCar);
+        float stopSignArea = 0;
+        for (size_t i = 0; i < stopsigns.size(); i++)
+        {
+            Point center( stopsigns[i].x + stopsigns[i].width/2, stopsigns[i].y + stopsigns[i].height/2 );
+            //Draw a circle when recognized
+            ellipse( frame, center, Size( stopsigns[i].width/2, stopsigns[i].height/2 ), 0, 0, 360, Scalar( 255, 0, 255 ), 4, 8, 0 );
+            Mat faceROI = frame_gray( stopsigns[i] );
+            stopSignArea += stopsigns[i].width * stopsigns[i].height;
+        }
+        if( stopSignArea > 200 ) {
+            if(stopSignPresent){
+                //DO NOTHING because we already sent the message.
+            } else {
+                stopSignPresent = true;
+                stopSignPresenceUpdate.stopSignPresence(true);
+                std::cout << "sending stop sign detected message: " << std::endl;
+                od4->send(stopSignPresenceUpdate);
+            }
+            //This will only apply if the already detected stop sign is far away to send the message for stopping the commandlineArguments
+            //Send a message when the state has changed. It will flood the buss with messages. Only interested when the boolean changes.
+        } else {
+            if(stopSignPresent){
+                std::cout << "sending NO stop sign present message: " << std::endl;
+                //TODO
+                stopSignPresenceUpdate.stopSignPresence(false);
+                od4 -> send(stopSignPresenceUpdate);
+                stopSignPresent = false;
+            }
+        }
+        //if there is not stop sign detected
+    } else {
+        if(stopSignPresent){
+            std::cout << "sending NO stop sign present message: " << std::endl;
+            //TODO
+            stopSignPresenceUpdate.stopSignPresence(false);
+            od4 -> send(stopSignPresenceUpdate);
+            stopSignPresent = false;
+        }
     }
-    for (size_t i = 0; i < stopsigns.size(); i++)
-    {
-        Point center( stopsigns[i].x + stopsigns[i].width/2, stopsigns[i].y + stopsigns[i].height/2 );
-        //Draw a circle when recognized
-        ellipse( frame, center, Size( stopsigns[i].width/2, stopsigns[i].height/2 ), 0, 0, 360, Scalar( 255, 0, 255 ), 4, 8, 0 );
-        Mat faceROI = frame_gray( stopsigns[i] );
-        
-    }
+    
     
     // -- Opens a new window with the Stop sign recognition on
     imshow( "stopSign", frame );
