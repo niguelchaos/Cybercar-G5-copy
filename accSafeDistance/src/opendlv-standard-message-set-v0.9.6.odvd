@@ -364,3 +364,31 @@ message opendlv.logic.cognition.GroundSteeringLimit [id = 1191] {
 message opendlv.logic.cognition.GroundSpeedLimit [id = 1192] {
   float speedLimit [id = 1];
 }
+
+message HelloWorld [id = 2000] {
+   string helloworld [id = 1];
+}
+
+message SpeedUp [id = 2001] {
+   float speed [id = 1];
+}
+
+message SpeedDown [id = 2002] {
+   float speed [id = 1];
+}
+
+message MoveRight [id = 2003] {
+   float angle [id = 1];
+}
+
+message MoveLeft [id = 2004] {
+   float angle [id = 1];
+}
+
+message SteeringCorrectionRequest [id = 2005] {
+   float amount [id = 1];
+}
+
+message SpeedCorrectionRequest [id = 2006] {
+   float amount [id = 1];
+}
