@@ -14,7 +14,6 @@
 #include <opencv2/dnn.hpp>
 #include <cstring>
 #include "opencv2/objdetect.hpp"
-#include "stdafx.h"
 
 
 #include <iostream>
@@ -23,9 +22,13 @@ using namespace cv;
 using namespace std;
 //defining variables for stop sign
 String stopSignCascadeName;
-CascadeClassifier stopSignCascade;
+CascadeClassifier stopSignCascadeClassifier;
+//Defining variables for stop sign
+String carsCascadeName;
+CascadeClassifier carsCascadeClassifier;
 
 void detectAndDisplayStopSign( Mat frame );
+void detectAndDisplayCars( Mat frame );
 
 static void help(const char* programName)
 {
@@ -267,7 +270,13 @@ int main(int argc, char** argv) {
    //Loading the haar cascade
    //"../stopSignClassifier.xml" because the build file is in another folder, necessary to build for testing
    stopSignCascadeName = "../stopSignClassifier.xml";
-   if(!stopSignCascade.load(stopSignCascadeName)){printf("--(!)Error loading stopsign cascade\n"); return -1; };
+   if(!stopSignCascadeClassifier.load(stopSignCascadeName)){printf("--(!)Error loading stopsign cascade\n"); return -1; };
+   
+   //Loading the haar cascade
+   //"../cars.xml" because the build file is in another folder, necessary to build for testing
+   //classifier taken from https://github.com/AdityaPai2398/Vehicle-And-Pedestrian-Detection-Using-Haar-Cascades
+   carsCascadeName = "../cars.xml";
+   if(!carsCascadeClassifier.load(carsCascadeName)){printf("--(!)Error loading stopsign cascade\n"); return -1; };
 
 
    // Capture the video stream from default or supplied capturing device.
@@ -284,7 +293,8 @@ int main(int argc, char** argv) {
      }
 // Method for detecting stop sign with haar cascade
      detectAndDisplayStopSign(frame);
-     detect_text(String input);
+     //Method for detecting cars
+     detectAndDisplayCars(frame);
      
       // Convert from BGR to HSV colorspace
       cvtColor(frame, frame_HSV, COLOR_BGR2HSV);
@@ -330,7 +340,7 @@ void detectAndDisplayStopSign( Mat frame )
     cvtColor( frame, frame_gray, COLOR_BGR2GRAY );
     equalizeHist( frame_gray, frame_gray );
     //-- Detect stop signs
-    stopSignCascade.detectMultiScale( frame_gray, stopsigns, 1.1, 2, 0|CASCADE_SCALE_IMAGE, Size(60, 60) );
+    stopSignCascadeClassifier.detectMultiScale( frame_gray, stopsigns, 1.1, 2, 0|CASCADE_SCALE_IMAGE, Size(60, 60) );
    for ( size_t i = 0; i < stopsigns.size(); i++ )
     {
         Point center( stopsigns[i].x + stopsigns[i].width/2, stopsigns[i].y + stopsigns[i].height/2 );
@@ -342,3 +352,25 @@ void detectAndDisplayStopSign( Mat frame )
 imshow( "stopSign", frame );
     
 }
+
+void detectAndDisplayCars( Mat frame )
+{
+   
+    std::vector<Rect> cars;
+    Mat frame_gray;
+    cvtColor( frame, frame_gray, COLOR_BGR2GRAY );
+    equalizeHist( frame_gray, frame_gray );
+    //-- Detect stop signs
+    carsCascadeClassifier.detectMultiScale( frame_gray, cars, 1.1, 2, 0|CASCADE_SCALE_IMAGE, Size(60, 60) );
+   for ( size_t i = 0; i < cars.size(); i++ )
+    {
+        Point center( cars[i].x + cars[i].width/2, cars[i].y + cars[i].height/2 );
+        //Draw a circle when recognized
+       ellipse( frame, center, Size( cars[i].width/2, cars[i].height/2 ), 0, 0, 360, Scalar( 255, 0, 255 ), 4, 8, 0 );
+       Mat faceROI = frame_gray( cars[i] );
+    }
+   // -- Opens a new window with the Stop sign recognition on
+imshow( "cars", frame );
+    
+}
+
