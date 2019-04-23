@@ -83,9 +83,15 @@ if(UNIX)
     endif()
 endif()
 
-find_package(OpenCV REQUIRED core highgui imgproc)
+find_package(OpenCV REQUIRED core highgui imgproc objdetect)
 include_directories(SYSTEM ${OpenCV_INCLUDE_DIRS})
-set(LIBRARIES ${LIBRARIES} ${OpenCV_LIBS})
+
+message(STATUS "OpenCV library status:")
+message(STATUS "    version: ${OpenCV_VERSION}")
+message(STATUS "    libraries: ${OpenCV_LIBS}")
+message(STATUS "    include path: ${OpenCV_INCLUDE_DIRS}")
+
+set(LIBRARIES ${LIBRARIES} ${OpenCV_LIBS} )
 
 ################################################################################
 # Create executable.
