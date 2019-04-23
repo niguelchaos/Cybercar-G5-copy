@@ -15,11 +15,14 @@
 #include <cstring>
 #include "opencv2/objdetect.hpp"
 
+#include "cluon-complete.hpp"
+#include "opendlv-standard-message-set.hpp"
 
 #include <iostream>
 
 using namespace cv;
 using namespace std;
+using namespace cluon;
 //defining variables for stop sign
 String stopSignCascadeName;
 CascadeClassifier stopSignCascadeClassifier;
@@ -267,6 +270,24 @@ int main(int argc, char** argv) {
    int high_S_blue = 255;
    int high_V_blue = 255;
    
+   // Interface to a running OpenDaVINCI session; here, you can send and receive messages.
+   static cluon::OD4Session od4(123,
+     [](cluon::data::Envelope &&envelope) noexcept {
+     if (envelope.dataType() == 2000) {
+        HelloWorld receivedHello = cluon::extractMessage<HelloWorld>(std::move(envelope));
+        std::cout << receivedHello.helloworld() << std::endl;
+     }
+     if (envelope.dataType() == 2001) {
+        SpeedUp speedup = cluon::extractMessage<SpeedUp>(std::move(envelope));
+        std::cout << speedup.speed() << std::endl;
+     }
+     if (envelope.dataType() == 2002) {
+        SpeedDown speeddown = cluon::extractMessage<SpeedDown>(std::move(envelope));
+        std::cout << speeddown.speed() << std::endl;
+     }
+   });
+
+   
    //Loading the haar cascade
    //"../stopSignClassifier.xml" because the build file is in another folder, necessary to build for testing
    stopSignCascadeName = "../stopSignClassifier.xml";
@@ -283,18 +304,26 @@ int main(int argc, char** argv) {
    VideoCapture cap(argc > 1 ? atoi(argv[1]) : 0);
 
    while (true) {
-   // get frame from the video
+// get frame from the video
      cap >> frame;
-   //   roi=selectROI("tracker",frame);
-   //
+//   roi=selectROI("tracker",frame);
+//
      if(frame.empty()) {
          break;
          help(argv[0]);
      }
+//Sending helloworld  
+     HelloWorld helloworld;
+     helloworld.helloworld("Hello world aaaaaaaaaa");
+     od4.send(helloworld);
+
 // Method for detecting stop sign with haar cascade
      detectAndDisplayStopSign(frame);
+     
+     
      //Method for detecting cars
      detectAndDisplayCars(frame);
+     
      
       // Convert from BGR to HSV colorspace
       cvtColor(frame, frame_HSV, COLOR_BGR2HSV);

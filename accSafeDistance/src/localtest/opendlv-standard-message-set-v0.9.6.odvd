@@ -376,20 +376,18 @@ message opendlv.logic.cognition.GroundSpeedLimit [id = 1192] {
   float speedLimit [id = 1];
 }
 
-
-
-message helloworld [id = 2000] {
+message HelloWorld [id = 2000] {
    string helloworld [id = 1];
 }
 
-message speedUp [id = 2001] {
+message SpeedUp [id = 2001] {
    float speed [id = 1];
 }
 
-message speedDown [id = 2002] {
+message SpeedDown [id = 2002] {
    float speed [id = 1];
 }
 
-message StopCarRequest(id = 2007){
-    
+message StopCarRequest[id = 2007]{
+    float stopRequest [id = 1];
 }

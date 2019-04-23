@@ -47,11 +47,12 @@
 
 using namespace std;
 using namespace cv;
+using namespace cluon;
 //defining variables for stop sign
 String stopSignCascadeName;
 CascadeClassifier stopSignCascade;
 
-void detectAndDisplayStopSign( Mat frame );
+void detectAndDisplayStopSign( Mat frame, OD4Session *od4);
 
 
 int32_t main(int32_t argc, char **argv) {
@@ -90,21 +91,22 @@ int32_t main(int32_t argc, char **argv) {
                 if(!stopSignCascade.load(stopSignCascadeName)){printf("--(!)Error loading stopsign cascade\n"); return -1; };
                 
                 
-                
-                /*          auto onStopCar{[&od4, VERBOSE](cluon::data::Envelope &&envelope)
-                 *        {
-                 *                auto msg = cluon::extractMessage<StopCarRequest>(std::move(envelope));
-                 *                float amount = msg.amount(); // Get the amount
-                 *                
-                 *            if (VERBOSE)
-                 *            {
-                 *                    std::cout << "Received stop request message: " << amount << std::endl;
+        /*        //Receving messages
+                         auto onStopCar{[&od4, VERBOSE](cluon::data::Envelope &&envelope)
+                         {
+                                 auto msg = cluon::extractMessage<StopCarRequest>(std::move(envelope));
+                                 float amount = msg.amount(); // Get the amount
+                                
+                            if (VERBOSE)
+                            {
+                                    std::cout << "Received stop request message: " << amount << std::endl;
             }
             
             }
             };
-            od4.dataTrigger(StopCarRequest::ID(), onStopCar);*/
+            od4.dataTrigger(StopCarRequest::ID(), onStopCar);
                 
+            */
                 
                 
                 
@@ -136,19 +138,16 @@ int32_t main(int32_t argc, char **argv) {
                     frame(Rect(Point(100, 150), Point(580, 400))).copyTo(cropped_frame);
                     
                     // Method for detecting stop sign with haar cascade
-                    detectAndDisplayStopSign(frame);
+                    detectAndDisplayStopSign(frame , &od4);
                     
                     //Sending messages for stop sign detection
-                    // StopCarRequest stopCar;
-                    // od4.send(stopCar);
-                    
-                    // show image with the tracked object
-                    // Example: Draw a red rectangle and display image.
-                    // cv::rectangle(img, cv::Point(50, 50), cv::Point(100, 100), cv::Scalar(0,0,255));
+                     StopCarRequest stopCar;
+                     
+     
                     
                     // Display image.
                     if (VERBOSE) {
-                        //std::cout << "sending stop sign message: " << std::endl;
+                        std::cout << "sending stop sign message: " << std::endl;
                         cv::waitKey(1); 
                         
                     }
@@ -163,8 +162,9 @@ int32_t main(int32_t argc, char **argv) {
 //Haar cascade for Stop sign copied and modified from 
 //https://docs.opencv.org/3.4.1/db/d28/tutorial_cascade_classifier.html
 //Classifier gotten from : https://github.com/markgaynor/stopsigns
-void detectAndDisplayStopSign( Mat frame )
+void detectAndDisplayStopSign( Mat frame, OD4Session *od4)
 {
+    StopCarRequest stopCar;
     
     std::vector<Rect> stopsigns;
     Mat frame_gray;
@@ -172,13 +172,18 @@ void detectAndDisplayStopSign( Mat frame )
     equalizeHist( frame_gray, frame_gray );
     //-- Detect stop signs
     stopSignCascade.detectMultiScale(frame_gray, stopsigns, 1.1, 2, 0|CASCADE_SCALE_IMAGE, Size(60, 60));
+    if (stopsigns.size() > 0){
+        od4->send(stopCar);
+    }
     for (size_t i = 0; i < stopsigns.size(); i++)
     {
         Point center( stopsigns[i].x + stopsigns[i].width/2, stopsigns[i].y + stopsigns[i].height/2 );
         //Draw a circle when recognized
         ellipse( frame, center, Size( stopsigns[i].width/2, stopsigns[i].height/2 ), 0, 0, 360, Scalar( 255, 0, 255 ), 4, 8, 0 );
         Mat faceROI = frame_gray( stopsigns[i] );
+        
     }
+    
     // -- Opens a new window with the Stop sign recognition on
     imshow( "stopSign", frame );
     
