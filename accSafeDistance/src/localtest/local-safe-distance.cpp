@@ -14,13 +14,18 @@
 #include <opencv2/dnn.hpp>
 #include <cstring>
 #include "opencv2/objdetect.hpp"
+#include "stdafx.h"
+
 
 #include <iostream>
 
 using namespace cv;
 using namespace std;
+//defining variables for stop sign
+String stopSignCascadeName;
+CascadeClassifier stopSignCascade;
 
-void detectAndDisplay( Mat frame );
+void detectAndDisplayStopSign( Mat frame );
 
 static void help(const char* programName)
 {
@@ -239,9 +244,6 @@ int main(int argc, char** argv) {
    Mat finalFrameBlue;
    vector<vector<Point> > pinkSquares;
    vector<vector<Point> > blueSquares;
-   
-   String stopSignCascadeName;
-   CascadeClassifier stopSignCascade;
 
    const int max_value_H = 360/2;
    const int max_value = 255;
@@ -263,9 +265,9 @@ int main(int argc, char** argv) {
    int high_V_blue = 255;
    
    //Loading the haar cascade
-   stopSignCascadeName = "stopSignClassifier.xml";
-   stopSignCascade
-   if( !stopSignCascade.load( stopSignCascadeName ) ){ printf("--(!)Error loading stopsign cascade\n"); return -1; };
+   //"../stopSignClassifier.xml" because the build file is in another folder, necessary to build for testing
+   stopSignCascadeName = "../stopSignClassifier.xml";
+   if(!stopSignCascade.load(stopSignCascadeName)){printf("--(!)Error loading stopsign cascade\n"); return -1; };
 
 
    // Capture the video stream from default or supplied capturing device.
@@ -280,20 +282,10 @@ int main(int argc, char** argv) {
          break;
          help(argv[0]);
      }
-    //Haar cascade for Stop sign 
-     std::vector<Rect> stopsigns;
-    Mat frame_gray;
-    cvtColor( frame, frame_gray, COLOR_BGR2GRAY );
-    equalizeHist( frame_gray, frame_gray );
-    //-- Detect stopsigns
-    stopSignCascade.detectMultiScale( frame_gray, stopsigns, 1.1, 2, 0|CASCADE_SCALE_IMAGE, Size(60, 60) );
-    for ( size_t i = 0; i < stopsigns.size(); i++ )
-    {
-        Point center( stopsigns[i].x + stopsigns[i].width/2, stopsigns[i].y + stopsigns[i].height/2 );
-        ellipse( frame, center, Size( stopsigns[i].width/2, stopsigns[i].height/2 ), 0, 0, 360, Scalar( 255, 0, 255 ), 4, 8, 0 );
-        Mat faceROI = frame_gray( stopsigns[i] );
-    }
-
+// Method for detecting stop sign with haar cascade
+     detectAndDisplayStopSign(frame);
+     detect_text(String input);
+     
       // Convert from BGR to HSV colorspace
       cvtColor(frame, frame_HSV, COLOR_BGR2HSV);
       // Detect the object based on HSV Range Values
@@ -315,8 +307,7 @@ int main(int argc, char** argv) {
       // show image with the tracked object
       imshow("Pink", finalFramePink);
       imshow("Blue", finalFrameBlue);
-      imshow( "stopSign", frame );
-
+      
       // // show image with the tracked object
       // imshow("tracker",frame);
 
@@ -328,20 +319,26 @@ int main(int argc, char** argv) {
     return 0;
 }
 
-//void detectAndDisplay( Mat frame )
-//{
-//    std::vector<Rect> stopsigns;
-//    Mat frame_gray;
-//    cvtColor( frame, frame_gray, COLOR_BGR2GRAY );
-//    equalizeHist( frame_gray, frame_gray );
-    //-- Detect stopsigns
-//    stopSignCascade.detectMultiScale( frame_gray, stopsigns, 1.1, 2, 0|CASCADE_SCALE_IMAGE, Size(60, 60) );
-//    for ( size_t i = 0; i < stopsigns.size(); i++ )
- //   {
-  //      Point center( stopsigns[i].x + stopsigns[i].width/2, stopsigns[i].y + stopsigns[i].height/2 );
- //       ellipse( frame, center, Size( stopsigns[i].width/2, stopsigns[i].height/2 ), 0, 0, 360, Scalar( 255, 0, 255 ), 4, 8, 0 );
- //       Mat faceROI = frame_gray( stopsigns[i] );
-  //  }
-    //-- Show what you got
-   // imshow( window_name, frame );
-//}
+//Haar cascade for Stop sign copied and modified from 
+//https://docs.opencv.org/3.4.1/db/d28/tutorial_cascade_classifier.html
+//Classifier gotten from : https://github.com/markgaynor/stopsigns
+void detectAndDisplayStopSign( Mat frame )
+{
+   
+    std::vector<Rect> stopsigns;
+    Mat frame_gray;
+    cvtColor( frame, frame_gray, COLOR_BGR2GRAY );
+    equalizeHist( frame_gray, frame_gray );
+    //-- Detect stop signs
+    stopSignCascade.detectMultiScale( frame_gray, stopsigns, 1.1, 2, 0|CASCADE_SCALE_IMAGE, Size(60, 60) );
+   for ( size_t i = 0; i < stopsigns.size(); i++ )
+    {
+        Point center( stopsigns[i].x + stopsigns[i].width/2, stopsigns[i].y + stopsigns[i].height/2 );
+        //Draw a circle when recognized
+       ellipse( frame, center, Size( stopsigns[i].width/2, stopsigns[i].height/2 ), 0, 0, 360, Scalar( 255, 0, 255 ), 4, 8, 0 );
+       Mat faceROI = frame_gray( stopsigns[i] );
+    }
+   // -- Opens a new window with the Stop sign recognition on
+imshow( "stopSign", frame );
+    
+}
