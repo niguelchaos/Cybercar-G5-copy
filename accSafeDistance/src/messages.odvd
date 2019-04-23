@@ -389,3 +389,7 @@ message speedUp [id = 2001] {
 message speedDown [id = 2002] {
    float speed [id = 1];
 }
+
+message StopCarRequest(id = 2007){
+    
+}
