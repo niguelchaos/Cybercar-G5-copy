@@ -75,9 +75,11 @@ int32_t main(int32_t argc, char **argv) {
             // Interface to a running OpenDaVINCI session; here, you can send and receive messages.
             cluon::OD4Session od4{static_cast<uint16_t>(std::stoi(commandlineArguments["cid"]))};
 
+            // Measure beginning time
             int64_t starttimestampmicro = cluon::time::toMicroseconds(cluon::time::now());
             int64_t starttimestampsecs = starttimestampmicro / 1000000;
             cout << "Timestamp: " << starttimestampsecs << endl;
+
             // Endless loop; end the program by pressing Ctrl-C.
          while (od4.isRunning()) {
              Mat frame;
@@ -94,12 +96,6 @@ int32_t main(int32_t argc, char **argv) {
              const int max_value_H = 360/2;
              const int max_value = 255;
 
-             // fps counter begin
-            // time_t start, end;
-
-            // double sec;
-            // double fps;
-            // fps counter end
 
              // Wait for a notification of a new frame.
              sharedMemory->wait();
@@ -117,23 +113,17 @@ int32_t main(int32_t argc, char **argv) {
              }
              sharedMemory->unlock();
 
-            // fps counter begin
-            // if (framecounter == 0){
-            //     std::time(&start);
-            // }
+             // measure current time; needs to be after frame is copied to shared memory. I think.
+             int64_t prevtimestampsecs;
+             int64_t timestampmicro = cluon::time::toMicroseconds(cluon::time::now());
+             int64_t timestampsecs = timestampmicro / 1000000;
 
+             int framecounter;
              // TODO: Do something with the frame.
              // HelloWorld helloworld;
              // helloworld.helloworld("Hello world from camera safe distance checker gweh");
              // od4.send(helloworld);
              // cout << "sent helloworld" <<"\n";
-             int64_t prevtimestampsecs;
-
-             int64_t timestampmicro = cluon::time::toMicroseconds(cluon::time::now());
-             int64_t timestampsecs = timestampmicro / 1000000;
-
-            int framecounter;
-
 
              // Pink
                int low_H_pink = 135;
@@ -174,14 +164,13 @@ int32_t main(int32_t argc, char **argv) {
                  cv::waitKey(1);
             }
 
-
+            // measures FPS
             framecounter++;
             if (timestampsecs != prevtimestampsecs) {
                cout << "Timestamp: " << timestampsecs << "          FPS: " << framecounter << endl;
                prevtimestampsecs = timestampsecs;
                framecounter = 0;
             }
-
          }
       }
      retCode = 0;
@@ -292,20 +281,20 @@ static void findSquares( const Mat& image, vector<vector<Point> >& squares )
 void checkCarDistance(double area, OD4Session *od4) {
    SpeedUp speed_up;
    SpeedDown speed_down;
-   float hard_accel = 0.01f;
-   float soft_accel = 0.005f;
-   float soft_brake = -0.005f;
-   float hard_brake = -0.01f;
-   float instant_stop = 5;
+   float hard_accel = 1;
+   float soft_accel = 0.5f;
+   float soft_brake = -0.5f;
+   float hard_brake = -1;
+   // float instant_stop = 5;
 
 // PID controller test
 // https://robotics.stackexchange.com/questions/9786/how-do-the-pid-parameters-kp-ki-and-kd-affect-the-heading-of-a-differential
-   SpeedCorrection speed_correction;
+   SpeedCorrectionRequest speed_correction;
 
-   float optimal_area = 25000;
+   float optimal_area = 12500;
    float time_interval = 0.05f;
    float error = optimal_area - (float) area;
-   float kp = 1.1f; // proportional gain constant, tunes controller.
+   float kp = 1.6f; // proportional gain constant, tunes controller.
    // float ki = 1.1;
    // float kd = 1;
    // float integral += error * time_interval // integral estimates future error.
@@ -316,33 +305,38 @@ void checkCarDistance(double area, OD4Session *od4) {
 
 ///////////////////////////// hard coded speed correction ///////////////////////
    cout << " [[ area: " << area << " ]]";
-   cout << "           [ speed correction : " << correction_speed << " ]\n";
+   cout << " // [ speed correction : " << correction_speed << " ] // ";
 
    if (area < 5000) {
       cout << "Too far away. Speed up. \n";
-      speed_up.speed(hard_accel);
+      // speed_up.speed(hard_accel);
+      // speed_correction.amount(hard_accel);
    }
    if (area >= 5000 && area < 10000) {
-      cout << "Catching up. Begin matching speed. \n";
-      speed_up.speed(soft_accel);
+      cout << "Catching up. \n";
+      // speed_up.speed(soft_accel);
+      // speed_correction.amount(soft_accel);
    }
    if (area >= 10000 && area < 15000) {
       // cout << "length: " << length << "\n";
-      cout << "Optimal. Match Speed. \n";
-      speed_up.speed(0);
-      speed_down.speed(0);
+      cout << "Optimal. \n";
+      // speed_up.speed(0);
+      // speed_down.speed(0);
+      // speed_correction.amount(0);
    }
    if (area >= 15000 && area < 25000) {
-      cout << "Slow down. Nearing Car. \n";
-      speed_down.speed(soft_brake);
+      cout << " Nearing Car. \n";
+      // speed_down.speed(soft_brake);
+      // speed_correction.amount(soft_brake);
    }
    if (area >= 25000 && area < 35000) {
-      cout << "Brake Hard. Almost crashing. \n";
-      speed_down.speed(hard_brake); // will go backwards if car already stopped
+      cout << "Almost crashing. \n";
+      // speed_down.speed(hard_brake); // will go backwards if car already stopped
+      // speed_correction.amount(hard_brake);
    }
    if (area >= 35000) {
-      cout << "Stop. Probably already crashed. \n";
-      speed_down.speed(instant_stop); // 5 would be the code to stop. if simply added as pedal, car would immediately go backwards full speed.
+      cout << "Probably crashed.\n";
+      // speed_down.speed(instant_stop); // 5 would be the code to stop. if simply added as pedal, car would immediately go backwards full speed.
       //might need new message, or just use pid controller
    }
    od4->send(speed_up);
@@ -356,21 +350,21 @@ void checkCarDistance(double area, OD4Session *od4) {
 
 void checkCarPosition(double centerX, OD4Session *od4) {
    int frame_center = 320;
-   float offset = 60;
+   float offset = 40;
    float hard_offset = 2.5f * offset;
 
    MoveRight move_right;
    MoveLeft move_left;
 
    // positive steer = left, negative = right
-   float hard_left = 0.5f;
-   float left = 0.25f;
-   float right = -0.25f;
-   float hard_right = -0.5f;
+   float hard_left = 1;
+   float left = 0.5f;
+   float right = -0.5f;
+   float hard_right = -1;
 
 // PID controller test
 // https://robotics.stackexchange.com/questions/9786/how-do-the-pid-parameters-kp-ki-and-kd-affect-the-heading-of-a-differential
-   SteeringCorrection steering_correction;
+   SteeringCorrectionRequest steering_correction;
    float time_interval = 0.05f;
    float error = frame_center - (float) centerX;
    float kp = 1.1f; // proportional gain constant, tunes controller.
@@ -383,29 +377,35 @@ void checkCarPosition(double centerX, OD4Session *od4) {
    float correction_angle = output / 1000; // because groundsteering accepts 0 - 1
 
 //////////////////////// hard coded corrections ///////////////////
-   cout << "center X:       " << centerX << "           ";
-   cout << "[steering correction: " << correction_angle << "]\n";
+   cout << "[[center X: " << centerX << " ]]";
+   cout << " // [ steering correction: " << correction_angle << " ]  // ";
 
    if (centerX < frame_center - hard_offset) {
-      cout << "    <<<< car going hard left \n  ";
-      move_left.angle(hard_left);
+      cout << " <<<< Hard left \n  ";
+      // move_left.angle(hard_left);
+      // steering_correction.amount(hard_left);
    }
-   else if (centerX < frame_center - offset) {
-      cout << "      << car going left \n  ";
-      move_left.angle(left);
+   else if (centerX >= frame_center - hard_offset && centerX < frame_center - offset) {
+      cout << "  << Left \n  ";
+      // move_left.angle(left);
+      // steering_correction.amount(left);
    }
    else if (centerX >= frame_center - offset && centerX < frame_center + offset) {
-      cout << "      || car in front || \n  ";
-      move_left.angle(0);
-      move_right.angle(0);
+      cout << " || In front || \n  ";
+      // move_left.angle(0);
+      // move_right.angle(0);
+      // steering_correction.amount(0);
    }
-   else if (centerX >= frame_center + offset) {
-      cout << "      car going right >> \n";
-      move_right.angle(right);
+   else if (centerX >= frame_center + offset && centerX < frame_center + hard_offset) {
+      cout << " Right >> \n";
+      // move_right.angle(right);
+      // steering_correction.amount(right);
+
    }
    else if (centerX >= frame_center + hard_offset) {
-      cout << "      car going hard right >>>> \n";
-      move_right.angle(hard_right);
+      cout << " Hard right >>>> \n";
+      // move_right.angle(hard_right);
+      // steering_correction.amount(hard_right);
    }
    od4->send(move_left);
    od4->send(move_right);
