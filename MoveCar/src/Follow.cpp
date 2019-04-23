@@ -97,7 +97,7 @@ int32_t main(int32_t argc, char **argv) {
  
         const bool VERBOSE{commandlineArguments.count("verbose") != 0};
 	const float SPEED{(commandlineArguments["speed"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["speed"])) : static_cast<float>(0.14)};
-	const float SAFETYDISTANCE{(commandlineArguments["safetyDistance"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["safetyDistance"])) : static_cast<float>(0.5)};
+	const float SAFETYDISTANCE{(commandlineArguments["safetyDistance"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["safetyDistance"])) : static_cast<float>(0.05)};
 	const float SPEEDINCREMENT{(commandlineArguments["speedIncrement"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["speedIncrement"])) : static_cast<float>(0.01)};
 	const float STEERINCREMENT{(commandlineArguments["steerIncrement"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["steerIncrement"])) : static_cast<float>(0.01)};
 
@@ -130,7 +130,7 @@ int32_t main(int32_t argc, char **argv) {
         od4.dataTrigger(opendlv::proxy::DistanceReading::ID(), onFrontDistanceReading);
 
 
-	 auto onHelloWorld{[&od4,VERBOSE](cluon::data::Envelope &&envelope)
+	 /*auto onHelloWorld{[&od4,VERBOSE](cluon::data::Envelope &&envelope)
             // &<variables> will be captured by reference (instead of value only)
             {
 
@@ -147,14 +147,14 @@ int32_t main(int32_t argc, char **argv) {
 
 
 
-			/*if(currentDistance > SAFETYDISTANCE) 
+			if(currentDistance > SAFETYDISTANCE) 
 				MoveForward(od4, SPEED, VERBOSE);
 			else 
-				StopCar(od4, VERBOSE);*/
+				StopCar(od4, VERBOSE);
 	
             }
         };
-        od4.dataTrigger(HelloWorld::ID(), onHelloWorld);
+        od4.dataTrigger(HelloWorld::ID(), onHelloWorld);*/
 
 
 
@@ -186,6 +186,7 @@ int32_t main(int32_t argc, char **argv) {
 	    }
         };
         od4.dataTrigger(SpeedCorrectionRequest::ID(), onSpeedCorrection);
+
 
 	auto onSteeringCorrection{[&od4, STEERINCREMENT, VERBOSE](cluon::data::Envelope &&envelope)
             {
@@ -230,18 +231,54 @@ int32_t main(int32_t argc, char **argv) {
         od4.dataTrigger(StopCarRequest::ID(), onStopCar);
 	
 
+	/*auto onSpeedCorrection{[&od4, VERBOSE](cluon::data::Envelope &&envelope)
+            {
+		if (!stopCarSent) {
+		        auto msg = cluon::extractMessage<SpeedCorrectionRequest>(std::move(envelope));
+		        float amount = msg.amount(); // Get the amount
+		        
+			if (VERBOSE)
+			{
+		    		std::cout << "Received Speed Correction message: " << amount << std::endl;
+			}
+			
+			currentCarSpeed += amount;
+
+			MoveForward(od4, currentCarSpeed, VERBOSE);
+		}
+	    }
+        };
+	od4.dataTrigger(SpeedCorrectionRequest::ID(), onSpeedCorrection);
+
+
+	auto onSteeringCorrection{[&od4, VERBOSE](cluon::data::Envelope &&envelope)
+            {
+		if (!stopCarSent) {
+		        auto msg = cluon::extractMessage<SteeringCorrectionRequest>(std::move(envelope));
+		        float amount = msg.amount(); // Get the amount
+		        
+			if (VERBOSE)
+			{
+		    		std::cout << "Received Steering Correction message: " << amount << std::endl;
+			}
+			
+			currentSteering += amount;
+
+			SetSteering(od4, currentSteering, VERBOSE);
+		}
+	    }
+        };
+        od4.dataTrigger(SteeringCorrectionRequest::ID(), onSteeringCorrection);*/
+	
+
+
+
 
         while(od4.isRunning())
         {
 // only sends messages
-		/*opendlv::logic::SpeedUp speedUp;
-		speedUp.speedUp(1.1);
-		od4.send(speedUp);
-		if (VERBOSE) std::cout << "Speed Up sent (1.1)" << std::endl;
-std::this_thread::sleep_for(std::chrono::milliseconds(1000));*/
 
-
-		HelloWorld helloWorld;
+		/*HelloWorld helloWorld;
 		helloWorld.helloWorld("i HATE CAR");
 		od4.send(helloWorld);
 		if (VERBOSE) std::cout << "Hello World sent (i HATE CAR)" << std::endl;
@@ -266,7 +303,7 @@ std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
 		SpeedCorrectionRequest speedCorrection2;
 		speedCorrection2.amount(-1);
-		od4.send(speedCorrection2);
+		od4.send(speedCorrection2);*/
 
 
 	}
