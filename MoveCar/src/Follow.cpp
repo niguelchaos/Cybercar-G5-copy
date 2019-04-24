@@ -306,6 +306,14 @@ std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 		od4.send(speedCorrection2);*/
 
 
+
+	if (!stopCarSent){
+
+	MoveForward (od4, 0.13, VERBOSE);
+	
+	}
+
+
 	}
         return 0;
     }
