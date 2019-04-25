@@ -214,7 +214,7 @@ int32_t main(int32_t argc, char **argv) {
         od4.dataTrigger(SteeringCorrectionRequest::ID(), onSteeringCorrection);
 
 	// Receive StopCar message and stops the car. This is reaction on stop sign detection
-	auto onStopCar{[&od4, VERBOSE](cluon::data::Envelope&&)
+	/*auto onStopCar{[&od4, VERBOSE](cluon::data::Envelope&&)
             {
 		if (!stopCarSent) {
 
@@ -228,7 +228,46 @@ int32_t main(int32_t argc, char **argv) {
 		}
 	    }
         };
-        od4.dataTrigger(StopCarRequest::ID(), onStopCar);
+        od4.dataTrigger(StopCarRequest::ID(), onStopCar);*/
+
+
+
+	//Bool messages for sotping the car
+
+	auto onStopCar{[&od4, VERBOSE](cluon::data::Envelope &&envelope)
+            {
+		if (!stopCarSent) {
+		auto msg = cluon::extractMessage<StopSignPresenceUpdate>(std::move(envelope));
+		bool stopSignPresence = msg.stopSignPresence(); // Get the bool
+
+			if (VERBOSE)
+			{
+		    		std::cout << "Received Stop car message: " << std::endl;
+			}
+
+			if (stopSignPresence==true){
+
+
+			stopCarSent = true;
+			StopCar(od4, VERBOSE);
+			}
+
+
+			if (stopSignPresence==false){
+			
+			MoveForward (od4, 0.13, VERBOSE);
+			
+			}
+		}
+	    }
+        };
+        od4.dataTrigger(StopSignPresenceUpdate::ID(), onStopCar);
+
+
+
+
+
+
 	
 
 	/*auto onSpeedCorrection{[&od4, VERBOSE](cluon::data::Envelope &&envelope)
@@ -303,15 +342,18 @@ std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
 		SpeedCorrectionRequest speedCorrection2;
 		speedCorrection2.amount(-1);
-		od4.send(speedCorrection2);*/
+		od4.send(speedCorrection2);
 
+		
+		StopSignPresenceUpdate stopSign;
+		stopSign.stopSignPresence(true);
+		od4.send(stopSign);*/
 
-
-	if (!stopCarSent){
+	/*if (!stopCarSent){
 
 	MoveForward (od4, 0.13, VERBOSE);
 	
-	}
+	}*/
 
 
 	}
