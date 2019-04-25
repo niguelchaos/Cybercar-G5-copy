@@ -291,7 +291,7 @@ void checkCarDistance(double area, OD4Session *od4) {
 // https://robotics.stackexchange.com/questions/9786/how-do-the-pid-parameters-kp-ki-and-kd-affect-the-heading-of-a-differential
    SpeedCorrectionRequest speed_correction;
 
-   float optimal_area = 12500;
+   float optimal_area = 6500;
    float time_interval = 0.05f;
    float error = optimal_area - (float) area;
    float kp = 0.8f; // proportional gain constant, tunes controller.
@@ -307,40 +307,40 @@ void checkCarDistance(double area, OD4Session *od4) {
    cout << " [[ area: " << area << " ]]";
    cout << " // [ speed correction : " << correction_speed << " ] // ";
 
-   if (area < 5000) {
+   if (area < 2500) {
       cout << "Too far away. Speed up. \n";
       // speed_up.speed(hard_accel);
       // speed_correction.amount(hard_accel);
    }
-   if (area >= 5000 && area < 10000) {
+   if (area >= 2500 && area < 5000) {
       cout << "Catching up. \n";
       // speed_up.speed(soft_accel);
       // speed_correction.amount(soft_accel);
    }
-   if (area >= 10000 && area < 15000) {
+   if (area >= 5000 && area < 7500) {
       // cout << "length: " << length << "\n";
       cout << "Optimal. \n";
       // speed_up.speed(0);
       // speed_down.speed(0);
       // speed_correction.amount(0);
    }
-   if (area >= 15000 && area < 25000) {
+   if (area >= 7500 && area < 12500) {
       cout << " Nearing Car. \n";
       // speed_down.speed(soft_brake);
       // speed_correction.amount(soft_brake);
    }
-   if (area >= 25000 && area < 35000) {
+   if (area >= 12500 && area < 17500) {
       cout << "Almost crashing. \n";
       // speed_down.speed(hard_brake); // will go backwards if car already stopped
       // speed_correction.amount(hard_brake);
    }
-   if (area >= 35000) {
+   if (area >= 17500) {
       cout << "Probably crashed.\n";
       // speed_down.speed(instant_stop); // 5 would be the code to stop. if simply added as pedal, car would immediately go backwards full speed.
       //might need new message, or just use pid controller
    }
-   od4->send(speed_up);
-   od4->send(speed_down);
+   // od4->send(speed_up);
+   // od4->send(speed_down);
    /////////////////////////////////////////////////////////////////////
 
    /////////////////////// PID controller ///////////////////////
@@ -407,8 +407,8 @@ void checkCarPosition(double centerX, OD4Session *od4) {
       // move_right.angle(hard_right);
       // steering_correction.amount(hard_right);
    }
-   od4->send(move_left);
-   od4->send(move_right);
+   // od4->send(move_left);
+   // od4->send(move_right);
    ///////////////////////////////////////////////////////
 
    /////////////////////////// PID Controller test ////////////////////////////
