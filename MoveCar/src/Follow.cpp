@@ -96,8 +96,11 @@ int32_t main(int32_t argc, char **argv) {
         }
 
    const bool VERBOSE{commandlineArguments.count("verbose") != 0};
-	const float STARTSPEED{(commandlineArguments["speed"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["speed"])) : static_cast<float>(0.14)};
+	const float STARTSPEED{(commandlineArguments["speed"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["speed"])) : static_cast<float>(0.12)};
 	const float MAXSPEED{(commandlineArguments["speed"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["speed"])) : static_cast<float>(0.3)};
+
+	const float MAXSTEER{(commandlineArguments["steer"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["steer"])) : static_cast<float>(1)};
+	const float MINSTEER{(commandlineArguments["steer"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["steer"])) : static_cast<float>(-1)};
 	const float SAFETYDISTANCE{(commandlineArguments["safetyDistance"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["safetyDistance"])) : static_cast<float>(0.1)};
 	// const float SPEEDINCREMENT{(commandlineArguments["speedIncrement"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["speedIncrement"])) : static_cast<float>(0.01)};
 	// const float STEERINCREMENT{(commandlineArguments["steerIncrement"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["steerIncrement"])) : static_cast<float>(0.01)};
@@ -225,7 +228,7 @@ int32_t main(int32_t argc, char **argv) {
 	od4.dataTrigger(SpeedCorrectionRequest::ID(), onSpeedCorrection);
 
 
-	auto onSteeringCorrection{[&od4, VERBOSE](cluon::data::Envelope &&envelope)
+	auto onSteeringCorrection{[&od4, VERBOSE, MAXSTEER, MINSTEER, MAXSPEED, STARTSPEED ](cluon::data::Envelope &&envelope)
             {
 		if (!stopCarSent) {
 		        auto msg = cluon::extractMessage<SteeringCorrectionRequest>(std::move(envelope));
@@ -236,13 +239,20 @@ int32_t main(int32_t argc, char **argv) {
 		    		std::cout << "Received Steering Correction message: " << amount << std::endl;
 			}
 
-			// check if car is in front
-			if (msg.amount() >= -0.1 && msg.amount() < 0.1 &&
-				currentSteering <= -5 && currentSteering > 5 &&
-				currentCarSpeed < 0.14) {
-					currentSteering = 0;
+			// check if...  acc car is in front
+			if (amount >= -0.1 && amount < 0.1 && // and correction is to brake or go
+				currentSteering <= -0.05 && currentSteering > 0.05 && // and wheels are straight
+				currentCarSpeed < STARTSPEED) { // and car is stopped
+					currentSteering = 0; //then reset wheels
 			} else {
 				currentSteering += amount;
+
+				if (currentSteering > MAXSTEER) {
+					currentSteering = MAXSTEER;
+				}
+				if (currentSteering < MINSTEER) {
+					currentSteering = MINSTEER;
+				}
 			}
 			SetSteering(od4, currentSteering, VERBOSE);
 		}
