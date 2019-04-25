@@ -20,7 +20,7 @@
 #include <iostream>
 #include <sstream>
 #include <thread>
-#include <string> 
+#include <string>
 
 #include "cluon-complete.hpp"
 #include "messages.hpp"
@@ -40,7 +40,7 @@ void SetSpeed(cluon::OD4Session& od4, float speed, bool VERBOSE)
 void StopCar(cluon::OD4Session& od4, bool VERBOSE)
 {
 	SetSpeed(od4, 0.0, VERBOSE);
-	if (VERBOSE) std::cout << "Now stop ..." << std::endl;
+	if (VERBOSE) { std::cout << "		[ Now stop ...] " << std::endl; }
 }
 
 void MoveForward(cluon::OD4Session& od4, float speed, bool VERBOSE)
@@ -94,12 +94,13 @@ int32_t main(int32_t argc, char **argv) {
             std::cerr << "ERROR: No OD4Session running!!!" << std::endl;
             return -2;
         }
- 
-        const bool VERBOSE{commandlineArguments.count("verbose") != 0};
-	const float SPEED{(commandlineArguments["speed"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["speed"])) : static_cast<float>(0.14)};
-	const float SAFETYDISTANCE{(commandlineArguments["safetyDistance"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["safetyDistance"])) : static_cast<float>(0.05)};
-	const float SPEEDINCREMENT{(commandlineArguments["speedIncrement"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["speedIncrement"])) : static_cast<float>(0.01)};
-	const float STEERINCREMENT{(commandlineArguments["steerIncrement"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["steerIncrement"])) : static_cast<float>(0.01)};
+
+   const bool VERBOSE{commandlineArguments.count("verbose") != 0};
+	const float STARTSPEED{(commandlineArguments["speed"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["speed"])) : static_cast<float>(0.14)};
+	const float MAXSPEED{(commandlineArguments["speed"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["speed"])) : static_cast<float>(0.3)};
+	const float SAFETYDISTANCE{(commandlineArguments["safetyDistance"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["safetyDistance"])) : static_cast<float>(0.1)};
+	// const float SPEEDINCREMENT{(commandlineArguments["speedIncrement"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["speedIncrement"])) : static_cast<float>(0.01)};
+	// const float STEERINCREMENT{(commandlineArguments["steerIncrement"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["steerIncrement"])) : static_cast<float>(0.01)};
 
         // A Data-triggered function to detect front obstacle and stop or move car accordingly
         float currentDistance{0.0};
@@ -110,18 +111,16 @@ int32_t main(int32_t argc, char **argv) {
 		        auto msg = cluon::extractMessage<opendlv::proxy::DistanceReading>(std::move(envelope));
 		        const uint16_t senderStamp = envelope.senderStamp(); // senderStamp 0 corresponds to front ultra-sound distance sensor
 		        currentDistance = msg.distance(); // Get the distance
-		        
-			// proceed only if senderStamp is 0 (front sensor) 
+
+			// proceed only if senderStamp is 0 (front sensor)
 			if(senderStamp == 0) {
-				if (VERBOSE)
-		        	{
-		            		std::cout << "Received DistanceReading message (senderStamp=" << senderStamp << "): " << currentDistance << std::endl;
+				if (VERBOSE) {
+		            // std::cout << "Received DistanceReading message (senderStamp=" << senderStamp << "): " << currentDistance << std::endl;
 		        	}
-
-
 				if(currentDistance <= SAFETYDISTANCE) {
 					StopCar(od4, VERBOSE); // Stop the car if obstacle is too close
 					currentCarSpeed = 0.0;
+					std::cout << "Received DistanceReading message: " << currentDistance << std::endl;
 				}
 			}
 		}
@@ -129,89 +128,59 @@ int32_t main(int32_t argc, char **argv) {
         };
         od4.dataTrigger(opendlv::proxy::DistanceReading::ID(), onFrontDistanceReading);
 
-
-	 /*auto onHelloWorld{[&od4,VERBOSE](cluon::data::Envelope &&envelope)
-            // &<variables> will be captured by reference (instead of value only)
-            {
-
-	std::cout << "Received Hello World message" << std::endl;
-                auto msg = cluon::extractMessage<HelloWorld>(std::move(envelope));
-               // const uint16_t senderStamp = envelope.senderStamp(); // senderStamp 0 corresponds to front ultra-sound distance sensor
-                std::string sayHello= msg.helloWorld(); // Get the distance
-                
-		// proceed only if senderStamp is 0 (front sensor) 
-			if (VERBOSE)
-                	{
-                    		std::cout << "Received Hello messagage " << sayHello << std::endl;
-                	}
-
-
-
-			if(currentDistance > SAFETYDISTANCE) 
-				MoveForward(od4, SPEED, VERBOSE);
-			else 
-				StopCar(od4, VERBOSE);
-	
-            }
-        };
-        od4.dataTrigger(HelloWorld::ID(), onHelloWorld);*/
-
-
-
-
-	auto onSpeedCorrection{[&od4, SPEED, SPEEDINCREMENT, VERBOSE](cluon::data::Envelope &&envelope)
-            {
-		if (!stopCarSent) {
-		        auto msg = cluon::extractMessage<SpeedCorrectionRequest>(std::move(envelope));
-		        float amount = msg.amount(); // Get the amount
-		        
-			if (VERBOSE)
-			{
-		    		std::cout << "Received Speed Correction message: " << amount << std::endl;
-			}
-			
-			if (amount > 0) {
-				// speed up
-				currentCarSpeed += SPEEDINCREMENT;
-				if ( currentCarSpeed < SPEED) currentCarSpeed = SPEED; // Set car speed to minimal moving car speed
-			}
-			else if (amount < 0) {
-				// slow down
-				currentCarSpeed -= SPEEDINCREMENT;
-				if (currentCarSpeed < 0.10) currentCarSpeed = 0.0;
-			}
-			
-			MoveForward(od4, currentCarSpeed, VERBOSE);
-		}
-	    }
-        };
-        od4.dataTrigger(SpeedCorrectionRequest::ID(), onSpeedCorrection);
-
-
-	auto onSteeringCorrection{[&od4, STEERINCREMENT, VERBOSE](cluon::data::Envelope &&envelope)
-            {
-		if (!stopCarSent) {
-		        auto msg = cluon::extractMessage<SteeringCorrectionRequest>(std::move(envelope));
-		        float amount = msg.amount(); // Get the amount
-		        
-			if (VERBOSE)
-			{
-		    		std::cout << "Received Steering Correction message: " << amount << std::endl;
-			}
-			
-			if (amount > 0) {
-				// speed up
-				currentSteering += STEERINCREMENT;
-			}
-			else if (amount < 0) {
-				// slow down
-				currentSteering -= STEERINCREMENT;
-			}
-			SetSteering(od4, currentSteering, VERBOSE);
-		}
-	    }
-        };
-        od4.dataTrigger(SteeringCorrectionRequest::ID(), onSteeringCorrection);
+		//   auto onSpeedCorrection{[&od4, SPEED, SPEEDINCREMENT, VERBOSE](cluon::data::Envelope &&envelope)
+	   //            {
+	  	// 	if (!stopCarSent) {
+	  	// 	        auto msg = cluon::extractMessage<SpeedCorrectionRequest>(std::move(envelope));
+	  	// 	        float amount = msg.amount(); // Get the amount
+		//
+	  	// 		if (VERBOSE)
+	  	// 		{
+	  	// 	    		std::cout << "Received Speed Correction message: " << amount << std::endl;
+	  	// 		}
+		//
+	  	// 		if (amount > 0) {
+	  	// 			// speed up
+	  	// 			currentCarSpeed += SPEEDINCREMENT;
+	  	// 			if ( currentCarSpeed < SPEED) currentCarSpeed = SPEED; // Set car speed to minimal moving car speed
+	  	// 		}
+	  	// 		else if (amount < 0) {
+	  	// 			// slow down
+	  	// 			currentCarSpeed -= SPEEDINCREMENT;
+	  	// 			if (currentCarSpeed < 0.10) currentCarSpeed = 0.0;
+	  	// 		}
+		//
+	  	// 		MoveForward(od4, currentCarSpeed, VERBOSE);
+	  	// 	}
+	  	//     }
+	   //        };
+	   //        od4.dataTrigger(SpeedCorrectionRequest::ID(), onSpeedCorrection);
+		//
+		//
+	  	// auto onSteeringCorrection{[&od4, STEERINCREMENT, VERBOSE](cluon::data::Envelope &&envelope)
+	   //            {
+	  	// 	if (!stopCarSent) {
+	  	// 	        auto msg = cluon::extractMessage<SteeringCorrectionRequest>(std::move(envelope));
+	  	// 	        float amount = msg.amount(); // Get the amount
+		//
+	  	// 		if (VERBOSE)
+	  	// 		{
+	  	// 	    		std::cout << "Received Steering Correction message: " << amount << std::endl;
+	  	// 		}
+		//
+	  	// 		if (amount > 0) {
+	  	// 			// speed up
+	  	// 			currentSteering += STEERINCREMENT;
+	  	// 		}
+	  	// 		else if (amount < 0) {
+	  	// 			// slow down
+	  	// 			currentSteering -= STEERINCREMENT;
+	  	// 		}
+	  	// 		SetSteering(od4, currentSteering, VERBOSE);
+	  	// 	}
+	  	//     }
+	   //        };
+	   //        od4.dataTrigger(SteeringCorrectionRequest::ID(), onSteeringCorrection);
 
 	// Receive StopCar message and stops the car. This is reaction on stop sign detection
 	auto onStopCar{[&od4, VERBOSE](cluon::data::Envelope&&)
@@ -229,21 +198,26 @@ int32_t main(int32_t argc, char **argv) {
 	    }
         };
         od4.dataTrigger(StopCarRequest::ID(), onStopCar);
-	
 
-	/*auto onSpeedCorrection{[&od4, VERBOSE](cluon::data::Envelope &&envelope)
+
+	auto onSpeedCorrection{[&od4, VERBOSE, STARTSPEED, MAXSPEED](cluon::data::Envelope &&envelope)
             {
 		if (!stopCarSent) {
 		        auto msg = cluon::extractMessage<SpeedCorrectionRequest>(std::move(envelope));
 		        float amount = msg.amount(); // Get the amount
-		        
+
 			if (VERBOSE)
 			{
 		    		std::cout << "Received Speed Correction message: " << amount << std::endl;
 			}
-			
-			currentCarSpeed += amount;
-
+			if ( currentCarSpeed < STARTSPEED && amount > 0) {currentCarSpeed = STARTSPEED; }// Set car speed to minimal moving car speed
+			if (currentCarSpeed < 0.09 && amount < 0) {currentCarSpeed = 0.0;}
+			else {
+				currentCarSpeed += amount;
+				if (currentCarSpeed > MAXSPEED) {
+					currentCarSpeed = MAXSPEED;
+				}
+			}
 			MoveForward(od4, currentCarSpeed, VERBOSE);
 		}
 	    }
@@ -256,58 +230,59 @@ int32_t main(int32_t argc, char **argv) {
 		if (!stopCarSent) {
 		        auto msg = cluon::extractMessage<SteeringCorrectionRequest>(std::move(envelope));
 		        float amount = msg.amount(); // Get the amount
-		        
+
 			if (VERBOSE)
 			{
 		    		std::cout << "Received Steering Correction message: " << amount << std::endl;
 			}
-			
-			currentSteering += amount;
 
+			// check if car is in front
+			if (msg.amount() >= -0.1 && msg.amount() < 0.1 &&
+				currentSteering <= -5 && currentSteering > 5 &&
+				currentCarSpeed < 0.14) {
+					currentSteering = 0;
+			} else {
+				currentSteering += amount;
+			}
 			SetSteering(od4, currentSteering, VERBOSE);
 		}
 	    }
         };
-        od4.dataTrigger(SteeringCorrectionRequest::ID(), onSteeringCorrection);*/
-	
-
-
-
+        od4.dataTrigger(SteeringCorrectionRequest::ID(), onSteeringCorrection);
 
         while(od4.isRunning())
         {
 // only sends messages
 
-		/*HelloWorld helloWorld;
-		helloWorld.helloWorld("i HATE CAR");
-		od4.send(helloWorld);
-		if (VERBOSE) std::cout << "Hello World sent (i HATE CAR)" << std::endl;
-std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-	
-		SpeedCorrectionRequest speedCorrection;
-		speedCorrection.amount(1);
-		od4.send(speedCorrection);
-
-		std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-
-		SteeringCorrectionRequest steeringCorrection;
-		steeringCorrection.amount(-1);
-		od4.send(steeringCorrection);
-
-std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-		
-		StopCarRequest stopCar;
-		od4.send(stopCar);
-
-std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-
-		SpeedCorrectionRequest speedCorrection2;
-		speedCorrection2.amount(-1);
-		od4.send(speedCorrection2);*/
+// 		HelloWorld helloWorld;
+// 		helloWorld.helloWorld("i HATE CAR");
+// 		od4.send(helloWorld);
+// 		if (VERBOSE) std::cout << "Hello World sent (i HATE CAR)" << std::endl;
+// std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+//
+// 		SpeedCorrectionRequest speedCorrection;
+// 		speedCorrection.amount(1);
+// 		od4.send(speedCorrection);
+//
+// 		std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+//
+// 		SteeringCorrectionRequest steeringCorrection;
+// 		steeringCorrection.amount(-1);
+// 		od4.send(steeringCorrection);
+//
+// std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+//
+// 		StopCarRequest stopCar;
+// 		od4.send(stopCar);
+//
+// std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+//
+// 		SpeedCorrectionRequest speedCorrection2;
+// 		speedCorrection2.amount(-1);
+// 		od4.send(speedCorrection2);
 
 
 	}
         return 0;
     }
 }
-

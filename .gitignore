@@ -2,3 +2,6 @@
 # ignore vmbuild folder
 vmbuild/
 build/
+
+# ignore tar files
+*.tar
