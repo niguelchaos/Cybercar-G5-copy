@@ -294,7 +294,7 @@ void checkCarDistance(double area, OD4Session *od4) {
    float optimal_area = 12500;
    float time_interval = 0.05f;
    float error = optimal_area - (float) area;
-   float kp = 1.6f; // proportional gain constant, tunes controller.
+   float kp = 0.8f; // proportional gain constant, tunes controller.
    // float ki = 1.1;
    // float kd = 1;
    // float integral += error * time_interval // integral estimates future error.
@@ -367,7 +367,7 @@ void checkCarPosition(double centerX, OD4Session *od4) {
    SteeringCorrectionRequest steering_correction;
    float time_interval = 0.05f;
    float error = frame_center - (float) centerX;
-   float kp = 1.1f; // proportional gain constant, tunes controller.
+   float kp = 1.05f; // proportional gain constant, tunes controller.
    // float ki = 1.1;
    // float kd = 1;
    // float integral += error * time_interval // integral estimates future error.
