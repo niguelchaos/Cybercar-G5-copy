@@ -143,7 +143,7 @@ int32_t main(int32_t argc, char **argv) {
 
 
 
-            frame(Rect(Point(0, 150), Point(640, 370))).copyTo(cropped_frame);
+            frame(Rect(Point(0, 30), Point(640, 370))).copyTo(cropped_frame);
 
             // Convert from BGR to HSV colorspace
             cvtColor(cropped_frame, frame_HSV, COLOR_RGB2HSV);
@@ -155,7 +155,7 @@ int32_t main(int32_t argc, char **argv) {
             finalFramePink = drawSquares(frame_threshold_pink, pinkSquares, 1, &od4);
 
             findSquares(frame_threshold_green, greenSquares);
-            finalFrameGreen = drawSquares(frame_threshold_green, greenSquares, 1, &od4);
+            finalFrameGreen = drawSquares(frame_threshold_green, greenSquares, 0, &od4);
 
              // Display image.
             if (VERBOSE) {
@@ -294,51 +294,56 @@ void checkCarDistance(double area, OD4Session *od4) {
    float optimal_area = 6500;
    float time_interval = 0.05f;
    float error = optimal_area - (float) area;
-   float kp = 0.8f; // proportional gain constant, tunes controller.
+   // float kp = 0.8f; // proportional gain constant, tunes controller.
    // float ki = 1.1;
    // float kd = 1;
    // float integral += error * time_interval // integral estimates future error.
    // float derivative = (error - prev_error) / time_interval // looks at past error values
    // prev_error = error;
+   // float output = kp * error; // Ki * integral + Kd * derivative
+   // float correction_speed = output / 1000000; // pedal only accepts 0 - 1, need to modify correction to suit it.
+
+///////////////////////////// Absolute PID controller //////////////////////
+   float kp = 1f; // proportional gain constant, tunes controller.
    float output = kp * error; // Ki * integral + Kd * derivative
-   float correction_speed = output / 1000000; // pedal only accepts 0 - 1, need to modify correction to suit it.
+   float correction_speed = output / 13000; // pedal only accepts 0 - 1, need to modify correction to suit it.
 
 ///////////////////////////// hard coded speed correction ///////////////////////
    cout << " [[ area: " << area << " ]]";
    cout << " // [ speed correction : " << correction_speed << " ] // ";
 
-   if (area < 2500) {
-      cout << "Too far away. Speed up. \n";
+   // if (area < 2500) {
+   //    cout << "Too far away. Speed up. \n";
       // speed_up.speed(hard_accel);
       // speed_correction.amount(hard_accel);
-   }
-   if (area >= 2500 && area < 5000) {
-      cout << "Catching up. \n";
+   // }
+   // if (area >= 2500 && area < 5000) {
+   //    cout << "Catching up. \n";
       // speed_up.speed(soft_accel);
       // speed_correction.amount(soft_accel);
-   }
-   if (area >= 5000 && area < 7500) {
+   // }
+   // if (area >= 5000 && area < 7500) {
       // cout << "length: " << length << "\n";
-      cout << "Optimal. \n";
+      // cout << "Optimal. \n";
       // speed_up.speed(0);
       // speed_down.speed(0);
       // speed_correction.amount(0);
-   }
-   if (area >= 7500 && area < 12500) {
-      cout << " Nearing Car. \n";
+   // }
+   // if (area >= 7500 && area < 12500) {
+   //    cout << " Nearing Car. \n";
       // speed_down.speed(soft_brake);
       // speed_correction.amount(soft_brake);
-   }
-   if (area >= 12500 && area < 17500) {
-      cout << "Almost crashing. \n";
+   // }
+   // if (area >= 12500 && area < 17500) {
+   //    cout << "Almost crashing. \n";
       // speed_down.speed(hard_brake); // will go backwards if car already stopped
       // speed_correction.amount(hard_brake);
-   }
-   if (area >= 17500) {
-      cout << "Probably crashed.\n";
+   // }
+   // if (area >= 17500) {
+   //    cout << "Probably crashed.\n";
       // speed_down.speed(instant_stop); // 5 would be the code to stop. if simply added as pedal, car would immediately go backwards full speed.
       //might need new message, or just use pid controller
-   }
+   // }
    // od4->send(speed_up);
    // od4->send(speed_down);
    /////////////////////////////////////////////////////////////////////
@@ -367,46 +372,52 @@ void checkCarPosition(double centerX, OD4Session *od4) {
    SteeringCorrectionRequest steering_correction;
    float time_interval = 0.05f;
    float error = frame_center - (float) centerX;
-   float kp = 1.05f; // proportional gain constant, tunes controller.
+   // float kp = 1.1f; // proportional gain constant, tunes controller.
    // float ki = 1.1;
    // float kd = 1;
    // float integral += error * time_interval // integral estimates future error.
    // float derivative = (error - prev_error) / time_interval // looks at past error values
    // prev_error = error;
+   // float output = kp * error; // Ki * integral + Kd * derivative
+   // float correction_angle = output / 1000; // because groundsteering accepts 0 - 0.5 around
+
+//////////////////////// Absolute pid steering correction ////////////////////
+
+   float kp = 1;
    float output = kp * error; // Ki * integral + Kd * derivative
-   float correction_angle = output / 1000; // because groundsteering accepts 0 - 1
+   float correction_angle = output / 800; // because groundsteering accepts 0 - 0.5 around -> only max = 0.4 here
 
 //////////////////////// hard coded corrections ///////////////////
    cout << "[[center X: " << centerX << " ]]";
-   cout << " // [ steering correction: " << correction_angle << " ]  // ";
-
-   if (centerX < frame_center - hard_offset) {
-      cout << " <<<< Hard left \n  ";
+   // cout << " // [ steering correction: " << correction_angle << " ]  // ";
+   //
+   // if (centerX < frame_center - hard_offset) {
+   //    cout << " <<<< Hard left \n  ";
       // move_left.angle(hard_left);
       // steering_correction.amount(hard_left);
-   }
-   else if (centerX >= frame_center - hard_offset && centerX < frame_center - offset) {
-      cout << "  << Left \n  ";
+   // }
+   // else if (centerX >= frame_center - hard_offset && centerX < frame_center - offset) {
+   //    cout << "  << Left \n  ";
       // move_left.angle(left);
       // steering_correction.amount(left);
-   }
-   else if (centerX >= frame_center - offset && centerX < frame_center + offset) {
-      cout << " || In front || \n  ";
+   // }
+   // else if (centerX >= frame_center - offset && centerX < frame_center + offset) {
+   //    cout << " || In front || \n  ";
       // move_left.angle(0);
       // move_right.angle(0);
       // steering_correction.amount(0);
-   }
-   else if (centerX >= frame_center + offset && centerX < frame_center + hard_offset) {
-      cout << " Right >> \n";
+   // }
+   // else if (centerX >= frame_center + offset && centerX < frame_center + hard_offset) {
+   //    cout << " Right >> \n";
       // move_right.angle(right);
       // steering_correction.amount(right);
 
-   }
-   else if (centerX >= frame_center + hard_offset) {
-      cout << " Hard right >>>> \n";
+   // }
+   // else if (centerX >= frame_center + hard_offset) {
+   //    cout << " Hard right >>>> \n";
       // move_right.angle(hard_right);
       // steering_correction.amount(hard_right);
-   }
+   // }
    // od4->send(move_left);
    // od4->send(move_right);
    ///////////////////////////////////////////////////////
@@ -455,7 +466,8 @@ static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int f
       Point bot_right(rect_x + rect_width, rect_y + rect_height);
 
       if (followcar == 0) { // if not, they are other cars.
-         // only merge when all bounding boxes have been created.
+         // if not car we are following, they are other cars. count them.
+         countCars(image, boundRects);
       }
 
       if (followcar == 1) { // 1 = if car is the one we are following, check position and distance
@@ -463,8 +475,6 @@ static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int f
         checkCarPosition(rect_centerX, od4);
       }
    }
-
-   countCars(image, boundRects);
    return image;
 }
 
