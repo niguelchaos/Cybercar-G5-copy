@@ -54,6 +54,6 @@ RUN echo http://dl-4.alpinelinux.org/alpine/v3.8/main > /etc/apk/repositories &&
 RUN [ "cross-build-end" ]
 
 WORKDIR /usr/bin
-COPY --from=builder /tmp/bin/safe-distance .
+COPY --from=builder /tmp/bin/stop-sign .
 COPY src/stopSignClassifier.xml .
-ENTRYPOINT ["/usr/bin/safe-distance"]
+ENTRYPOINT ["/usr/bin/stop-sign"]
