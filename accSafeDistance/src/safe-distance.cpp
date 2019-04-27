@@ -39,12 +39,12 @@ using namespace std;
 using namespace cv;
 using namespace cluon;
 
-static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int followcar, OD4Session *od4 );
+static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int followcar, OD4Session *od4, double *prev_area );
 static void findSquares( const Mat& image, vector<vector<Point> >& squares );
 static double angle( Point pt1, Point pt2, Point pt0 );
 void countCars(Mat frame, vector<Rect>& rects);
 void checkCarPosition(double centerX, OD4Session *od4) ;
-void checkCarDistance(double area, OD4Session *od4);
+void checkCarDistance(double *prev_area, double area, double centerY, OD4Session *od4);
 
 int32_t main(int32_t argc, char **argv) {
     int32_t retCode{1};
@@ -78,7 +78,7 @@ int32_t main(int32_t argc, char **argv) {
             // Measure beginning time
             int64_t starttimestampmicro = cluon::time::toMicroseconds(cluon::time::now());
             int64_t starttimestampsecs = starttimestampmicro / 1000000;
-            cout << "Timestamp: " << starttimestampsecs << endl;
+            cout << "Starting Timestamp: " << starttimestampsecs << endl;
 
             // Endless loop; end the program by pressing Ctrl-C.
          while (od4.isRunning()) {
@@ -92,6 +92,8 @@ int32_t main(int32_t argc, char **argv) {
              Mat finalFrameGreen;
              vector<vector<Point> > pinkSquares;
              vector<vector<Point> > greenSquares;
+
+             double *prev_area; // used to determine whether car is moving
 
              const int max_value_H = 360/2;
              const int max_value = 255;
@@ -128,7 +130,7 @@ int32_t main(int32_t argc, char **argv) {
              // Pink
                int low_H_pink = 135;
                int low_S_pink = 50;
-               int low_V_pink = 70;
+               int low_V_pink = 65;
                int high_H_pink = max_value_H;
                int high_S_pink = max_value;
                int high_V_pink = max_value;
@@ -141,9 +143,7 @@ int32_t main(int32_t argc, char **argv) {
                int high_S_green = 182;
                int high_V_green = 255;
 
-
-
-            frame(Rect(Point(0, 30), Point(640, 370))).copyTo(cropped_frame);
+            frame(Rect(Point(0, 0), Point(640, 370))).copyTo(cropped_frame);
 
             // Convert from BGR to HSV colorspace
             cvtColor(cropped_frame, frame_HSV, COLOR_RGB2HSV);
@@ -152,16 +152,16 @@ int32_t main(int32_t argc, char **argv) {
             inRange(frame_HSV, Scalar(low_H_green, low_S_green, low_V_green), Scalar(high_H_green, high_S_green, high_V_green), frame_threshold_green);
 
             findSquares(frame_threshold_pink, pinkSquares);
-            finalFramePink = drawSquares(frame_threshold_pink, pinkSquares, 1, &od4);
+            finalFramePink = drawSquares(frame_threshold_pink, pinkSquares, 1, &od4, prev_area); // pass reference of prev_area
 
             findSquares(frame_threshold_green, greenSquares);
-            finalFrameGreen = drawSquares(frame_threshold_green, greenSquares, 0, &od4);
+            finalFrameGreen = drawSquares(frame_threshold_green, greenSquares, 0, &od4, prev_area);
 
              // Display image.
             if (VERBOSE) {
                imshow("Pink", finalFramePink);
                imshow("Green", finalFrameGreen);
-                 cv::waitKey(1);
+               cv::waitKey(1);
             }
 
             // measures FPS
@@ -278,75 +278,52 @@ static void findSquares( const Mat& image, vector<vector<Point> >& squares )
    }
 }
 
-void checkCarDistance(double area, OD4Session *od4) {
-   SpeedUp speed_up;
-   SpeedDown speed_down;
-   float hard_accel = 1;
-   float soft_accel = 0.5f;
-   float soft_brake = -0.5f;
-   float hard_brake = -1;
-   // float instant_stop = 5;
+void checkCarDistance(double *prev_area, double area, double centerY, OD4Session *od4) { // dereference prev_area here
+   // SpeedUp speed_up;
+   // SpeedDown speed_down;
+   // float hard_accel = 1;
+   // float soft_accel = 0.5f;
+   // float soft_brake = -0.5f;
+   // float hard_brake = -1;
 
 // PID controller test
 // https://robotics.stackexchange.com/questions/9786/how-do-the-pid-parameters-kp-ki-and-kd-affect-the-heading-of-a-differential
    SpeedCorrectionRequest speed_correction;
 
-   float optimal_area = 6500;
-   float time_interval = 0.05f;
+   float optimal_area = 8000; // default optimal area
+   float area_diff = (float)area - (float) *prev_area; // looks at how much car has accelerated/deccelerateds
+
+   if (area_diff > 100) {
+      // make optimal area farther(smaller) if the car has accelerated a lot to brake earlier and harder.
+      // small differences dont make much of a difference - deals with large variations of area
+      optimal_area = optimal_area - area_diff;
+   }
+   // float time_interval = 0.05f;
    float error = optimal_area - (float) area;
-   // float kp = 0.8f; // proportional gain constant, tunes controller.
+   float kp = 1; // proportional gain constant, tunes controller.
    // float ki = 1.1;
    // float kd = 1;
    // float integral += error * time_interval // integral estimates future error.
    // float derivative = (error - prev_error) / time_interval // looks at past error values
    // prev_error = error;
-   // float output = kp * error; // Ki * integral + Kd * derivative
-   // float correction_speed = output / 1000000; // pedal only accepts 0 - 1, need to modify correction to suit it.
+   float output = kp * error; // Ki * integral + Kd * derivative
+   float correction_speed = output / 900000; // pedal only accepts 0 - 1, need to modify correction to suit it.
 
 ///////////////////////////// Absolute PID controller //////////////////////
-   float kp = 1f; // proportional gain constant, tunes controller.
-   float output = kp * error; // Ki * integral + Kd * derivative
-   float correction_speed = output / 13000; // pedal only accepts 0 - 1, need to modify correction to suit it.
+   // float kp = 1; // proportional gain constant, tunes controller.
+   // float output = kp * error; // Ki * integral + Kd * derivative
+   // float correction_speed = output / 22900; // dividing it makes max output < 0.4 and > -0.4.
+///////////////////////////////////////////////////////////////////////////////
+
+   if (correction_speed < 0) { // braking needs to be faster than accelerating. I dont care.
+      correction_speed = correction_speed * 2; // hard double of braking speed
+   }
+
 
 ///////////////////////////// hard coded speed correction ///////////////////////
    cout << " [[ area: " << area << " ]]";
-   cout << " // [ speed correction : " << correction_speed << " ] // ";
-
-   // if (area < 2500) {
-   //    cout << "Too far away. Speed up. \n";
-      // speed_up.speed(hard_accel);
-      // speed_correction.amount(hard_accel);
-   // }
-   // if (area >= 2500 && area < 5000) {
-   //    cout << "Catching up. \n";
-      // speed_up.speed(soft_accel);
-      // speed_correction.amount(soft_accel);
-   // }
-   // if (area >= 5000 && area < 7500) {
-      // cout << "length: " << length << "\n";
-      // cout << "Optimal. \n";
-      // speed_up.speed(0);
-      // speed_down.speed(0);
-      // speed_correction.amount(0);
-   // }
-   // if (area >= 7500 && area < 12500) {
-   //    cout << " Nearing Car. \n";
-      // speed_down.speed(soft_brake);
-      // speed_correction.amount(soft_brake);
-   // }
-   // if (area >= 12500 && area < 17500) {
-   //    cout << "Almost crashing. \n";
-      // speed_down.speed(hard_brake); // will go backwards if car already stopped
-      // speed_correction.amount(hard_brake);
-   // }
-   // if (area >= 17500) {
-   //    cout << "Probably crashed.\n";
-      // speed_down.speed(instant_stop); // 5 would be the code to stop. if simply added as pedal, car would immediately go backwards full speed.
-      //might need new message, or just use pid controller
-   // }
-   // od4->send(speed_up);
-   // od4->send(speed_down);
-   /////////////////////////////////////////////////////////////////////
+   cout << "  // [[center Y: " << centerY << " ]] // ";
+   cout << " // [ speed correction : " << correction_speed << " ] // " << endl;
 
    /////////////////////// PID controller ///////////////////////
    speed_correction.amount(correction_speed);
@@ -355,23 +332,23 @@ void checkCarDistance(double area, OD4Session *od4) {
 
 void checkCarPosition(double centerX, OD4Session *od4) {
    int frame_center = 320;
-   float offset = 40;
-   float hard_offset = 2.5f * offset;
+   // float offset = 40;
+   // float hard_offset = 2.5f * offset;
 
-   MoveRight move_right;
-   MoveLeft move_left;
+   // MoveRight move_right;
+   // MoveLeft move_left;
 
    // positive steer = left, negative = right
-   float hard_left = 1;
-   float left = 0.5f;
-   float right = -0.5f;
-   float hard_right = -1;
+   // float hard_left = 1;
+   // float left = 0.5f;
+   // float right = -0.5f;
+   // float hard_right = -1;
 
 // PID controller test
 // https://robotics.stackexchange.com/questions/9786/how-do-the-pid-parameters-kp-ki-and-kd-affect-the-heading-of-a-differential
    SteeringCorrectionRequest steering_correction;
-   float time_interval = 0.05f;
    float error = frame_center - (float) centerX;
+   // float time_interval = 0.05f;
    // float kp = 1.1f; // proportional gain constant, tunes controller.
    // float ki = 1.1;
    // float kd = 1;
@@ -382,45 +359,12 @@ void checkCarPosition(double centerX, OD4Session *od4) {
    // float correction_angle = output / 1000; // because groundsteering accepts 0 - 0.5 around
 
 //////////////////////// Absolute pid steering correction ////////////////////
-
    float kp = 1;
    float output = kp * error; // Ki * integral + Kd * derivative
-   float correction_angle = output / 800; // because groundsteering accepts 0 - 0.5 around -> only max = 0.4 here
+   float correction_angle = output / 800; // because groundsteering max = 0.4 here
 
-//////////////////////// hard coded corrections ///////////////////
    cout << "[[center X: " << centerX << " ]]";
-   // cout << " // [ steering correction: " << correction_angle << " ]  // ";
-   //
-   // if (centerX < frame_center - hard_offset) {
-   //    cout << " <<<< Hard left \n  ";
-      // move_left.angle(hard_left);
-      // steering_correction.amount(hard_left);
-   // }
-   // else if (centerX >= frame_center - hard_offset && centerX < frame_center - offset) {
-   //    cout << "  << Left \n  ";
-      // move_left.angle(left);
-      // steering_correction.amount(left);
-   // }
-   // else if (centerX >= frame_center - offset && centerX < frame_center + offset) {
-   //    cout << " || In front || \n  ";
-      // move_left.angle(0);
-      // move_right.angle(0);
-      // steering_correction.amount(0);
-   // }
-   // else if (centerX >= frame_center + offset && centerX < frame_center + hard_offset) {
-   //    cout << " Right >> \n";
-      // move_right.angle(right);
-      // steering_correction.amount(right);
-
-   // }
-   // else if (centerX >= frame_center + hard_offset) {
-   //    cout << " Hard right >>>> \n";
-      // move_right.angle(hard_right);
-      // steering_correction.amount(hard_right);
-   // }
-   // od4->send(move_left);
-   // od4->send(move_right);
-   ///////////////////////////////////////////////////////
+   cout << " // [ steering correction: " << correction_angle << " ]  // " << endl;
 
    /////////////////////////// PID Controller test ////////////////////////////
    steering_correction.amount(correction_angle);
@@ -428,7 +372,7 @@ void checkCarPosition(double centerX, OD4Session *od4) {
 }
 
 // the function draws all the squares in the image
-static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int followcar, OD4Session *od4) // 0 = pink/other car, 1 = green/acc car
+static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int followcar, OD4Session *od4, double *prev_area) // 0 = pink/other car, 1 = green/acc car
 {
    Scalar color = Scalar(255,0,0 );
    vector<Rect> boundRects( squares.size() );
@@ -443,10 +387,8 @@ static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int f
       rectangle(image, boundRects[i].tl(), boundRects[i].br(), color, 2 );
 
       // we want the highest resolution possible for detecting acc car's position.
-      // Correction: ok maybe not
    }
 
-   // temporarily here to group no matter what color
    groupRectangles(boundRects, group_thresh, merge_box_diff);  //group overlapping rectangles into 1
 
    for (size_t i = 0; i < boundRects.size(); i++) {
@@ -471,8 +413,9 @@ static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int f
       }
 
       if (followcar == 1) { // 1 = if car is the one we are following, check position and distance
-        checkCarDistance(rect_area, od4);
-        checkCarPosition(rect_centerX, od4);
+        checkCarDistance( prev_area, rect_area, rect_centerY, od4); // again, pass prev_area reference
+        checkCarPosition( rect_centerX, od4);
+        *prev_area = rect_area; // remember this frame's area for the next frame
       }
    }
    return image;
@@ -485,9 +428,9 @@ void countCars(Mat frame, vector<Rect>& rects) {
       // cout << "No cars \n";
    }
    else if (rect_num == 1) {
-      cout << "               [  " << car_count << " car. ]  \n \n";
+      cout << "            [  " << car_count << " car. ]  \n \n";
    } else {
-         cout << "            [  " << car_count << " cars. ]  \n \n";
+      cout << "            [  " << car_count << " cars. ]  \n \n";
    }
    putText(frame, car_count, Point(5,100), FONT_HERSHEY_DUPLEX, 1, Scalar(255,255,255), 2);
 }
