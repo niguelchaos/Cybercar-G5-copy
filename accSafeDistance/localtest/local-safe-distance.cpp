@@ -14,10 +14,6 @@
 #include "opencv2/objdetect/objdetect.hpp"
 #include <opencv2/dnn.hpp>
 #include <cstring>
-#include "opencv2/objdetect.hpp"
-
-#include "cluon-complete.hpp"
-#include "opendlv-standard-message-set.hpp"
 
 #include "cluon-complete.hpp"
 #include "opendlv-standard-message-set.hpp"
@@ -27,16 +23,6 @@
 using namespace cv;
 using namespace std;
 using namespace cluon;
-
-//defining variables for stop sign
-String stopSignCascadeName;
-CascadeClassifier stopSignCascadeClassifier;
-//Defining variables for stop sign
-String carsCascadeName;
-CascadeClassifier carsCascadeClassifier;
-
-void detectAndDisplayStopSign( Mat frame );
-void detectAndDisplayCars( Mat frame );
 
 static void help(const char* programName)
 {
@@ -284,20 +270,17 @@ Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int followca
 }
 
 
-
-
 int main(int argc, char** argv) {
 
    Mat frame;
    Mat frame_HSV;
    Mat frame_gray;
-   Mat cropped_frame;
    Mat frame_threshold_pink;
-   Mat frame_threshold_blue;
+   Mat frame_threshold_yellow;
    Mat finalFramePink;
-   Mat finalFrameBlue;
+   Mat finalFrameYellow;
    vector<vector<Point> > pinkSquares;
-   vector<vector<Point> > blueSquares;
+   vector<vector<Point> > yellowSquares;
 
    const int max_value_H = 360/2;
    const int max_value = 255;
@@ -310,43 +293,13 @@ int main(int argc, char** argv) {
    int high_S_pink = max_value;
    int high_V_pink = max_value;
 
-// Blue
-   int low_H_blue = 52;
-   int low_S_blue = 128;
-   int low_V_blue = 111;
-   int high_H_blue = 158;
-   int high_S_blue = 255;
-   int high_V_blue = 255;
-   
-   // Interface to a running OpenDaVINCI session; here, you can send and receive messages.
-   static cluon::OD4Session od4(123,
-     [](cluon::data::Envelope &&envelope) noexcept {
-     if (envelope.dataType() == 2000) {
-        HelloWorld receivedHello = cluon::extractMessage<HelloWorld>(std::move(envelope));
-        std::cout << receivedHello.helloworld() << std::endl;
-     }
-     if (envelope.dataType() == 2001) {
-        SpeedUp speedup = cluon::extractMessage<SpeedUp>(std::move(envelope));
-        std::cout << speedup.speed() << std::endl;
-     }
-     if (envelope.dataType() == 2002) {
-        SpeedDown speeddown = cluon::extractMessage<SpeedDown>(std::move(envelope));
-        std::cout << speeddown.speed() << std::endl;
-     }
-   });
-
-   
-   //Loading the haar cascade
-   //"../stopSignClassifier.xml" because the build file is in another folder, necessary to build for testing
-   stopSignCascadeName = "../stopSignClassifier.xml";
-   if(!stopSignCascadeClassifier.load(stopSignCascadeName)){printf("--(!)Error loading stopsign cascade\n"); return -1; };
-   
-   //Loading the haar cascade
-   //"../cars.xml" because the build file is in another folder, necessary to build for testing
-   //classifier taken from https://github.com/AdityaPai2398/Vehicle-And-Pedestrian-Detection-Using-Haar-Cascades
-   carsCascadeName = "../cars.xml";
-   if(!carsCascadeClassifier.load(carsCascadeName)){printf("--(!)Error loading stopsign cascade\n"); return -1; };
-
+// Yellow
+   int low_H_yellow = 20;
+   int low_S_yellow = 50;
+   int low_V_yellow = 50;
+   int high_H_yellow = 98;
+   int high_S_yellow = 255;
+   int high_V_yellow = 206;
 
 
 
@@ -371,22 +324,18 @@ int main(int argc, char** argv) {
    VideoCapture cap(argc > 1 ? atoi(argv[1]) : 0);
 
    while (true) {
-// get frame from the video
+   // get frame from the video
      cap >> frame;
-//   roi=selectROI("tracker",frame);
-//
+   //   roi=selectROI("tracker",frame);
+   //
      if(frame.empty()) {
          break;
          help(argv[0]);
      }
 
-     
-//Sending helloworld  
-
      HelloWorld helloworld;
      helloworld.helloworld("Hello world aaaaaaaaaa");
      od4.send(helloworld);
-
 
      SpeedUp speedup;
      SpeedDown speeddown;
@@ -395,18 +344,11 @@ int main(int argc, char** argv) {
      carResult[0] = 0;
      carResult[1] = 0; //clear
 
-// Method for detecting stop sign with haar cascade
-     detectAndDisplayStopSign(frame);
-     
-     
-     //Method for detecting cars
-     detectAndDisplayCars(frame);
-     
       // Convert from BGR to HSV colorspace
       cvtColor(frame, frame_HSV, COLOR_BGR2HSV);
       // Detect the object based on HSV Range Values
       inRange(frame_HSV, Scalar(low_H_pink, low_S_pink, low_V_pink), Scalar(high_H_pink, high_S_pink, high_V_pink), frame_threshold_pink);
-      inRange(frame_HSV, Scalar(low_H_blue, low_S_blue, low_V_blue), Scalar(high_H_blue, high_S_blue, high_V_blue), frame_threshold_blue);
+      inRange(frame_HSV, Scalar(low_H_yellow, low_S_yellow, low_V_yellow), Scalar(high_H_yellow, high_S_yellow, high_V_yellow), frame_threshold_yellow);
 
       // convert it into grayscale and blur it to get rid of the noise.
       // cvtColor( frame, frame_gray, COLOR_BGR2GRAY );
@@ -415,8 +357,8 @@ int main(int argc, char** argv) {
       findSquares(frame_threshold_pink, pinkSquares);
       finalFramePink = drawSquares(frame_threshold_pink, pinkSquares, 0, carResult);
 
-      findSquares(frame_threshold_blue, blueSquares);
-      finalFrameBlue = drawSquares(frame_threshold_blue, blueSquares, 1, carResult);
+      findSquares(frame_threshold_yellow, yellowSquares);
+      finalFrameYellow = drawSquares(frame_threshold_yellow, yellowSquares, 1, carResult);
 
       if (carResult[0] < 0) { // slow down if speed is lower than 0
          speeddown.speed(carResult[0]);
@@ -427,14 +369,11 @@ int main(int argc, char** argv) {
          od4.send(speedup);
       }
 
-      findSquares(frame_threshold_blue, blueSquares);
-      finalFrameBlue = drawSquares(frame_threshold_blue, blueSquares);
-
 
       // show image with the tracked object
       imshow("Pink", finalFramePink);
-      imshow("Blue", finalFrameBlue);
-      
+      imshow("Yellow", finalFrameYellow);
+
       // // show image with the tracked object
       // imshow("tracker",frame);
 
@@ -445,49 +384,3 @@ int main(int argc, char** argv) {
    }
     return 0;
 }
-
-//Haar cascade for Stop sign copied and modified from 
-//https://docs.opencv.org/3.4.1/db/d28/tutorial_cascade_classifier.html
-//Classifier gotten from : https://github.com/markgaynor/stopsigns
-void detectAndDisplayStopSign( Mat frame )
-{
-   
-    std::vector<Rect> stopsigns;
-    Mat frame_gray;
-    cvtColor( frame, frame_gray, COLOR_BGR2GRAY );
-    equalizeHist( frame_gray, frame_gray );
-    //-- Detect stop signs
-    stopSignCascadeClassifier.detectMultiScale( frame_gray, stopsigns, 1.1, 2, 0|CASCADE_SCALE_IMAGE, Size(60, 60) );
-   for ( size_t i = 0; i < stopsigns.size(); i++ )
-    {
-        Point center( stopsigns[i].x + stopsigns[i].width/2, stopsigns[i].y + stopsigns[i].height/2 );
-        //Draw a circle when recognized
-       ellipse( frame, center, Size( stopsigns[i].width/2, stopsigns[i].height/2 ), 0, 0, 360, Scalar( 255, 0, 255 ), 4, 8, 0 );
-       Mat faceROI = frame_gray( stopsigns[i] );
-    }
-   // -- Opens a new window with the Stop sign recognition on
-imshow( "stopSign", frame );
-    
-}
-
-void detectAndDisplayCars( Mat frame )
-{
-   
-    std::vector<Rect> cars;
-    Mat frame_gray;
-    cvtColor( frame, frame_gray, COLOR_BGR2GRAY );
-    equalizeHist( frame_gray, frame_gray );
-    //-- Detect stop signs
-    carsCascadeClassifier.detectMultiScale( frame_gray, cars, 1.1, 2, 0|CASCADE_SCALE_IMAGE, Size(60, 60) );
-   for ( size_t i = 0; i < cars.size(); i++ )
-    {
-        Point center( cars[i].x + cars[i].width/2, cars[i].y + cars[i].height/2 );
-        //Draw a circle when recognized
-       ellipse( frame, center, Size( cars[i].width/2, cars[i].height/2 ), 0, 0, 360, Scalar( 255, 0, 255 ), 4, 8, 0 );
-       Mat faceROI = frame_gray( cars[i] );
-    }
-   // -- Opens a new window with the Stop sign recognition on
-imshow( "cars", frame );
-    
-}
-
