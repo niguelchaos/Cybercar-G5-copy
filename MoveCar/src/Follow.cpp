@@ -99,11 +99,11 @@ int32_t main(int32_t argc, char **argv) {
         }
 
    const bool VERBOSE{commandlineArguments.count("verbose") != 0};
-	const float STARTSPEED{(commandlineArguments["startspeed"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["startspeed"])) : static_cast<float>(0.12)};
-	const float MAXSPEED{(commandlineArguments["maxspeed"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["maxspeed"])) : static_cast<float>(0.5)};
+	const float STARTSPEED{(commandlineArguments["startspeed"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["startspeed"])) : static_cast<float>(0.11)};
+	const float MAXSPEED{(commandlineArguments["maxspeed"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["maxspeed"])) : static_cast<float>(0.35)};
 
-	const float MAXSTEER{(commandlineArguments["maxsteer"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["maxsteer"])) : static_cast<float>(0.4)};
-	const float MINSTEER{(commandlineArguments["minsteer"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["minsteer"])) : static_cast<float>(-0.4)};
+	const float MAXSTEER{(commandlineArguments["maxsteer"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["maxsteer"])) : static_cast<float>(0.38)};
+	const float MINSTEER{(commandlineArguments["minsteer"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["minsteer"])) : static_cast<float>(-0.38)};
 	const float SAFETYDISTANCE{(commandlineArguments["safetyDistance"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["safetyDistance"])) : static_cast<float>(0.1)};
 	// const float SPEEDINCREMENT{(commandlineArguments["speedIncrement"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["speedIncrement"])) : static_cast<float>(0.01)};
 	// const float STEERINCREMENT{(commandlineArguments["steerIncrement"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["steerIncrement"])) : static_cast<float>(0.01)};
@@ -206,61 +206,51 @@ int32_t main(int32_t argc, char **argv) {
         };
         od4.dataTrigger(StopCarRequest::ID(), onStopCar);
 
-
-	auto onSpeedCorrection{[&od4, VERBOSE, STARTSPEED, MAXSPEED](cluon::data::Envelope &&envelope) {
-		if (!stopCarSent) {
-		        auto msg = cluon::extractMessage<SpeedCorrectionRequest>(std::move(envelope));
-		        float amount = msg.amount(); // Get the amount
-
-			if (VERBOSE)
-			{
-		    		std::cout << "Received Speed Correction message: " << amount << std::endl;
-			}
-			if ( currentCarSpeed < STARTSPEED && amount > 0) 	{ currentCarSpeed = STARTSPEED;	}// Set car speed to minimal moving car speed
-			if ( currentCarSpeed < 0.09 && amount < 0) 			{ currentCarSpeed = 0.0;	} // automatically makes it 0, preventing car from moving backwards
-			else {
-				currentCarSpeed = amount;
-
-				if (currentCarSpeed > MAXSPEED) { currentCarSpeed = MAXSPEED;	} // limit the speed car can go
-				if (currentCarSpeed < STARTSPEED) { currentCarSpeed = 0;			}
-			}
-			MoveForward(od4, currentCarSpeed, VERBOSE);
-		}
-	}
-};
-
-
-// Relative PID controller version
-// 	auto onSteeringCorrection{[&od4, VERBOSE, MAXSTEER, MINSTEER, MAXSPEED, STARTSPEED ](cluon::data::Envelope &&envelope)
-// 	{
+// [Relative PID]
+// 	auto onSpeedCorrection{[&od4, VERBOSE, STARTSPEED, MAXSPEED](cluon::data::Envelope &&envelope) {
 // 		if (!stopCarSent) {
-// 		        auto msg = cluon::extractMessage<SteeringCorrectionRequest>(std::move(envelope));
+// 		        auto msg = cluon::extractMessage<SpeedCorrectionRequest>(std::move(envelope));
 // 		        float amount = msg.amount(); // Get the amount
 //
 // 			if (VERBOSE)
 // 			{
-// 		    		std::cout << "Received Steering Correction message: " << amount << std::endl;
+// 		    		std::cout << "Received Speed Correction message: " << amount << std::endl;
 // 			}
+// 			if ( currentCarSpeed < STARTSPEED && amount > 0) 	{ currentCarSpeed = STARTSPEED;	}// Set car speed to minimal moving car speed
+// 			if ( currentCarSpeed < STARTSPEED && amount < 0) 	{ currentCarSpeed = 0.0;	} // automatically makes it 0, preventing car from moving backwards
+// 			else {
+// 				currentCarSpeed += amount;
 //
-// 			// check if...
-// 			if (amount >= -0.1 && amount < 0.1 && // and acc car is relatively in front...
-// 				(currentSteering <= -0.05 || currentSteering > 0.05) && // and wheels are not straight...
-// 				currentCarSpeed < STARTSPEED) { // and car is stopped...
-// 					currentSteering = 0; // ...then reset wheels
-// 			} else {
-// 				currentSteering += amount;
-//
-// 				if (currentSteering > MAXSTEER) {
-// 					currentSteering = MAXSTEER;
-// 				}
-// 				if (currentSteering < MINSTEER) {
-// 					currentSteering = MINSTEER;
-// 				}
+// 				if (currentCarSpeed > MAXSPEED) 	{ currentCarSpeed = MAXSPEED;	} // limit the speed car can go
+// 				if (currentCarSpeed < STARTSPEED){ currentCarSpeed = 0;			} // prevent the car from going backwards. Twice.
 // 			}
-// 			SetSteering(od4, currentSteering, VERBOSE);
+// 			MoveForward(od4, currentCarSpeed, VERBOSE);
 // 		}
 // 	}
 // };
+
+// [Absolute pid]
+auto onSpeedCorrection{[&od4, VERBOSE, STARTSPEED, MAXSPEED](cluon::data::Envelope &&envelope) {
+	if (!stopCarSent) {
+			  auto msg = cluon::extractMessage<SpeedCorrectionRequest>(std::move(envelope));
+			  float amount = msg.amount(); // Get the amount
+
+		if (VERBOSE)
+		{
+				std::cout << "Received Absolute Speed Correction message: " << amount << std::endl;
+		}
+		// if ( currentCarSpeed < STARTSPEED && amount > 0) 	{ currentCarSpeed = STARTSPEED;	}// Set car speed to minimal moving car speed
+		if ( currentCarSpeed < 0 && amount < 0) 	{ currentCarSpeed = 0.0;	} // automatically makes it 0, preventing car from moving backwards
+		else {
+			currentCarSpeed = amount;
+
+			if (currentCarSpeed > MAXSPEED) 	{ currentCarSpeed = MAXSPEED;	} // limit the speed car can go
+			if (currentCarSpeed < 0 )			{ currentCarSpeed = 0;			} // prevent the car from going backwards. Twice.
+		}
+		MoveForward(od4, currentCarSpeed, VERBOSE);
+	}
+}
+};
 
 // Absolute pid steering
 auto onSteeringCorrection{[&od4, VERBOSE, MAXSTEER, MINSTEER, MAXSPEED, STARTSPEED ](cluon::data::Envelope &&envelope)
@@ -277,7 +267,7 @@ auto onSteeringCorrection{[&od4, VERBOSE, MAXSTEER, MINSTEER, MAXSPEED, STARTSPE
 		// check if...
 		if (amount >= -0.05 && amount < 0.05 && // and acc car is relatively in front...
 			(currentSteering <= -0.05 || currentSteering > 0.05) && // and wheels are not straight...
-			currentCarSpeed < STARTSPEED) { // and car is stopped...
+			currentCarSpeed < STARTSPEED - 0.05) { // and car is stopped...
 				currentSteering = 0; // ...then reset wheels
 				cout << "Steering Reset." << endl;
 		}
