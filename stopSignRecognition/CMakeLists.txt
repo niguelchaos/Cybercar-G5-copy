@@ -15,7 +15,7 @@
 
 cmake_minimum_required(VERSION 3.2)
 
-project(safe-distance)
+project(stop-sign)
 
 ################################################################################
 # Defining the relevant versions of OpenDLV Standard Message Set and libcluon.
