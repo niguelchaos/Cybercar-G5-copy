@@ -87,12 +87,6 @@ int main(int argc, char** argv) {
          help(argv[0]);
      }
 
-//Sending helloworld
-     HelloWorld helloworld;
-     helloworld.helloworld("Hello world aaaaaaaaaa");
-     od4.send(helloworld);
-
-
 // Method for detecting stop sign with haar cascade
      detectAndDisplayStopSign(frame);
 
@@ -107,30 +101,70 @@ int main(int argc, char** argv) {
     return 0;
 }
 
+bool insertCurrentFrameStopSign(bool stopSignCurrentFrame) {
+        seenFrameStopsigns[currentIndex] = stopSignCurrentFrame;
+        currentIndex++;
+        if(currentIndex >= lookBackNoOfFrames) {
+            currentIndex = 0;
+        }
+        
+        int noOfFramesWithStopsigns = 0; 
+        for(int i = 0; i < lookBackNoOfFrames; i++) {
+            if(seenFrameStopsigns[i]) {
+                noOfFramesWithStopsigns++;
+            }
+        }
+        if(noOfFramesWithStopsigns < NO_OF_STOPSIGNS_REQUIRED) {
+            return false;
+        }
+        else {
+            return true;
+        }
+}
+
 //Haar cascade for Stop sign copied and modified from
 //https://docs.opencv.org/3.4.1/db/d28/tutorial_cascade_classifier.html
 //Classifier gotten from : https://github.com/markgaynor/stopsigns
-void detectAndDisplayStopSign( Mat frame )
+void detectAndDisplayStopSign( Mat frame)
 {
+    //Sending messages for stop sign detection
+    StopSignPresenceUpdate stopSignPresenceUpdate;
+
     std::vector<Rect> stopsigns;
     Mat frame_gray;
     cvtColor( frame, frame_gray, COLOR_BGR2GRAY );
     equalizeHist( frame_gray, frame_gray );
     //-- Detect stop signs
-    stopSignCascadeClassifier.detectMultiScale( frame_gray, stopsigns, 1.1, 2, 0|CASCADE_SCALE_IMAGE, Size(60, 60) );
-   for ( size_t i = 0; i < stopsigns.size(); i++ )
-    {
-        Point center( stopsigns[i].x + stopsigns[i].width/2, stopsigns[i].y + stopsigns[i].height/2 );
-        //Draw a circle when recognized
-       ellipse( frame, center, Size( stopsigns[i].width/2, stopsigns[i].height/2 ), 0, 0, 360, Scalar( 255, 0, 255 ), 4, 8, 0 );
-       Mat faceROI = frame_gray( stopsigns[i] );
-    }
-   // -- Opens a new window with the Stop sign recognition on
-   imshow( "stopSign", frame );
+    stopSignCascade.detectMultiScale(frame_gray, stopsigns, 1.1, 2, 0|CASCADE_SCALE_IMAGE, Size(60, 60));
+    //checks if the stop sign is present in the current frame
+    
+        float stopSignArea = 0;
+        for (size_t i = 0; i < stopsigns.size(); i++)
+        {
+            Point center( stopsigns[i].x + stopsigns[i].width/2, stopsigns[i].y + stopsigns[i].height/2 );
+            //Draw a circle when recognized
+            ellipse( frame, center, Size( stopsigns[i].width/2, stopsigns[i].height/2 ), 0, 0, 360, Scalar( 0, 0, 255 ), 4, 8, 0 );
+            Mat faceROI = frame_gray( stopsigns[i] );
+            stopSignArea += stopsigns[i].width * stopsigns[i].height;
+        }
 
+            bool valueToReport = insertCurrentFrameStopSign(stopSignArea > 200);
+            if(stopSignPresent != valueToReport){
+                stopSignPresent = valueToReport;
+                stopSignPresenceUpdate.stopSignPresence(valueToReport);
+                if(valueToReport) {
+                    std::cout << "sending stop sign detected message: " << std::endl;
+                } else {
+                    std::cout << "sending NO stop sign present message: " << std::endl;
+                }
+                //od4->send(stopSignPresenceUpdate);
+            }
+    // -- Opens a new window with the Stop sign recognition on
+    imshow( "stopSign", frame );
 }
 
-void detectAndDisplayCars( Mat frame )
+
+/*void detectAndDisplayCars( Mat frame )
 {
 
     std::vector<Rect> cars;
@@ -149,4 +183,4 @@ void detectAndDisplayCars( Mat frame )
    // -- Opens a new window with the Stop sign recognition on
    imshow( "cars", frame );
 
-}
+}*/
