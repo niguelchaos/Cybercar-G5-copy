@@ -30,13 +30,19 @@ using namespace cluon;
 
 //defining variables for stop sign
 String stopSignCascadeName;
-CascadeClassifier stopSignCascadeClassifier;
+CascadeClassifier stopSignCascade;
 //Defining variables for stop sign
 String carsCascadeName;
 CascadeClassifier carsCascadeClassifier;
 
+bool stopSignPresent = false;
+const int lookBackNoOfFrames = 20;
+int NO_OF_STOPSIGNS_REQUIRED = 5;
+int currentIndex = 0;
+bool seenFrameStopsigns[lookBackNoOfFrames] = {false};
+
 void detectAndDisplayStopSign( Mat frame );
-void detectAndDisplayCars( Mat frame );
+//void detectAndDisplayCars( Mat frame );
 
 static void help(const char* programName)
 {
@@ -54,7 +60,7 @@ int main(int argc, char** argv) {
    Mat frame_gray;
    Mat cropped_frame;
 
-
+/*
    // Interface to a running OpenDaVINCI session; here, you can send and receive messages.
    static cluon::OD4Session od4(123,
      [](cluon::data::Envelope &&envelope) noexcept {
@@ -62,18 +68,18 @@ int main(int argc, char** argv) {
         HelloWorld receivedHello = cluon::extractMessage<HelloWorld>(std::move(envelope));
         std::cout << receivedHello.helloworld() << std::endl;
      }
-   });
+   });*/
 
    //Loading the haar cascade
    //"../stopSignClassifier.xml" because the build file is in another folder, necessary to build for testing
    stopSignCascadeName = "../stopSignClassifier.xml";
-   if(!stopSignCascadeClassifier.load(stopSignCascadeName)){printf("--(!)Error loading stopsign cascade\n"); return -1; };
+   if(!stopSignCascade.load(stopSignCascadeName)){printf("--(!)Error loading stopsign cascade\n"); return -1; };
 
    //Loading the haar cascade
    //"../cars.xml" because the build file is in another folder, necessary to build for testing
    //classifier taken from https://github.com/AdityaPai2398/Vehicle-And-Pedestrian-Detection-Using-Haar-Cascades
-   carsCascadeName = "../cars.xml";
-   if(!carsCascadeClassifier.load(carsCascadeName)){printf("--(!)Error loading stopsign cascade\n"); return -1; };
+  // carsCascadeName = "../cars.xml";
+   //if(!carsCascadeClassifier.load(carsCascadeName)){printf("--(!)Error loading stopsign cascade\n"); return -1; };
 
    // Capture the video stream from default or supplied capturing device.
    VideoCapture cap(argc > 1 ? atoi(argv[1]) : 0);
@@ -91,7 +97,7 @@ int main(int argc, char** argv) {
      detectAndDisplayStopSign(frame);
 
      //Method for detecting cars
-     detectAndDisplayCars(frame);
+    // detectAndDisplayCars(frame);
 
       int key = (char) waitKey(30);
       if ( key == 'q' || key == 27 ) {
@@ -101,14 +107,19 @@ int main(int argc, char** argv) {
     return 0;
 }
 
+//If there is a stop sing in the current frame then it returns a boolean weather 
+//
 bool insertCurrentFrameStopSign(bool stopSignCurrentFrame) {
+
         seenFrameStopsigns[currentIndex] = stopSignCurrentFrame;
         currentIndex++;
         if(currentIndex >= lookBackNoOfFrames) {
+            //Because we don't wanna go outside of the array.
             currentIndex = 0;
         }
         
         int noOfFramesWithStopsigns = 0; 
+        //Loop over the array and collect all the trues.
         for(int i = 0; i < lookBackNoOfFrames; i++) {
             if(seenFrameStopsigns[i]) {
                 noOfFramesWithStopsigns++;
@@ -148,6 +159,7 @@ void detectAndDisplayStopSign( Mat frame)
             stopSignArea += stopsigns[i].width * stopsigns[i].height;
         }
 
+        //It compares the previous state with the current one and it reports it if there is a change of state
             bool valueToReport = insertCurrentFrameStopSign(stopSignArea > 200);
             if(stopSignPresent != valueToReport){
                 stopSignPresent = valueToReport;
@@ -157,7 +169,7 @@ void detectAndDisplayStopSign( Mat frame)
                 } else {
                     std::cout << "sending NO stop sign present message: " << std::endl;
                 }
-                //od4->send(stopSignPresenceUpdate);
+               // od4->send(stopSignPresenceUpdate);
             }
     // -- Opens a new window with the Stop sign recognition on
     imshow( "stopSign", frame );

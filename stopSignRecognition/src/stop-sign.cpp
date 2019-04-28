@@ -147,14 +147,19 @@ int32_t main(int32_t argc, char **argv) {
    return retCode;
 }
 
+//If there is a stop sing in the current frame then it returns a boolean weather 
+//
 bool insertCurrentFrameStopSign(bool stopSignCurrentFrame) {
+
         seenFrameStopsigns[currentIndex] = stopSignCurrentFrame;
         currentIndex++;
         if(currentIndex >= lookBackNoOfFrames) {
+            //Because we don't wanna go outside of the array.
             currentIndex = 0;
         }
         
         int noOfFramesWithStopsigns = 0; 
+        //Loop over the array and collect all the trues.
         for(int i = 0; i < lookBackNoOfFrames; i++) {
             if(seenFrameStopsigns[i]) {
                 noOfFramesWithStopsigns++;
@@ -194,6 +199,7 @@ void detectAndDisplayStopSign( Mat frame, OD4Session *od4)
             stopSignArea += stopsigns[i].width * stopsigns[i].height;
         }
 
+        //It compares the previous state with the current one and it reports it if there is a change of state
             bool valueToReport = insertCurrentFrameStopSign(stopSignArea > 200);
             if(stopSignPresent != valueToReport){
                 stopSignPresent = valueToReport;
