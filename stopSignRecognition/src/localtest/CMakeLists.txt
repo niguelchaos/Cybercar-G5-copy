@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.2)
 
-project(local-safe-distance)
+project(local-stop-sign)
 
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Werror -Wno-error=maybe-uninitialized -Wno-error=unused-variable")
@@ -27,7 +27,6 @@ find_package(OpenCV REQUIRED)
 # Defining the relevant versions of OpenDLV Standard Message Set and libcluon.
 set(OPENDLV_STANDARD_MESSAGE_SET opendlv-standard-message-set-v0.9.6.odvd)
 set(CLUON_COMPLETE cluon-complete-v0.0.121.hpp)
-
 
 ################################################################################
 # Extract cluon-msc from cluon-complete.hpp.
@@ -58,7 +57,7 @@ INCLUDE_DIRECTORIES(../../${CMAKE_CURRENT_SOURCE_DIR})
 include_directories(${OpenCV_INCLUDE_DIRS})
 
 
-# add_executable(${PROJECT_NAME} ${CMAKE_CURRENT_SOURCE_DIR}/local-safe-distance.cpp)
+# add_executable(${PROJECT_NAME} ${CMAKE_CURRENT_SOURCE_DIR}/local-stop-sign.cpp)
 add_executable(${PROJECT_NAME} ${CMAKE_CURRENT_SOURCE_DIR}/${PROJECT_NAME}.cpp ${CMAKE_BINARY_DIR}/opendlv-standard-message-set.hpp)
 
 target_link_libraries(${PROJECT_NAME} Threads::Threads)
@@ -68,4 +67,3 @@ target_link_libraries(${PROJECT_NAME} ${LIBRARIES})
 ################################################################################
 # Install executable.
 install(TARGETS ${PROJECT_NAME} DESTINATION bin COMPONENT ${PROJECT_NAME})
-

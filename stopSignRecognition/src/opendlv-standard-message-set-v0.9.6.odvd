@@ -380,7 +380,7 @@ message StopSignPresenceUpdate[id = 2007]{
    bool stopSignPresence [id = 1];
 }
 
-
+/*
 message Helloworld [id = 2000] {
    string helloworld [id = 1];
 }
@@ -409,3 +409,7 @@ message SteeringCorrectionRequest [id = 2005] {
 message SpeedCorrectionRequest [id = 2006] {
    float amount [id = 1];
 }
+
+}*/
+
+
