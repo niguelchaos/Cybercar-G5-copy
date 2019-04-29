@@ -107,8 +107,7 @@ int main(int argc, char** argv) {
     return 0;
 }
 
-//If there is a stop sing in the current frame then it returns a boolean weather 
-//
+
 bool insertCurrentFrameStopSign(bool stopSignCurrentFrame) {
 
         seenFrameStopsigns[currentIndex] = stopSignCurrentFrame;
