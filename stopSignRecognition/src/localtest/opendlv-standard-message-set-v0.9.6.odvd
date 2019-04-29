@@ -375,7 +375,7 @@ message opendlv.logic.cognition.GroundSteeringLimit [id = 1191] {
 message opendlv.logic.cognition.GroundSpeedLimit [id = 1192] {
   float speedLimit [id = 1];
 }
-
+/*
 message HelloWorld [id = 2000] {
    string helloworld [id = 1];
 }
@@ -390,4 +390,8 @@ message SpeedDown [id = 2002] {
 
 message StopCarRequest[id = 2007]{
     float stopRequest [id = 1];
+}
+*/
+message StopSignPresenceUpdate[id = 2010]{
+   bool stopSignPresence [id = 1];
 }
