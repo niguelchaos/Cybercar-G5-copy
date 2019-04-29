@@ -2,6 +2,7 @@
 # ignore vmbuild folder
 vmbuild/
 build/
+building/
 
 # ignore tar files - too annoying to deal with
 *.tar
