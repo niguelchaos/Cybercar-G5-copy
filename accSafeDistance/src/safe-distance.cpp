@@ -15,8 +15,14 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
- // parts of Code copied from https://github.com/opencv/opencv/blob/master/samples/cpp/squares.cpp
- // https://docs.opencv.org/3.1.0/d2/d0a/tutorial_introduction_to_tracker.html
+// parts of Code copied from https://github.com/opencv/opencv/blob/master/samples/cpp/squares.cpp
+// https://docs.opencv.org/3.1.0/d2/d0a/tutorial_introduction_to_tracker.html
+
+// The "Square Detector" program.
+// It loads several images sequentially and tries to find squares in
+// each image
+
+
 
 #include "cluon-complete.hpp"
 #include "opendlv-standard-message-set.hpp"
@@ -25,9 +31,18 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include "opencv2/imgcodecs.hpp"
+
 #include "opencv2/objdetect/objdetect.hpp"
 #include <time.h> // to calculate time needed
 #include <limits.h> // to get INT_MAX, to protect against overflow
+
+#include <opencv2/videoio.hpp>
+#include <cstring>
+#include "opencv2/objdetect.hpp"
+#include "opencv2/highgui.hpp"
+#include "opencv2/imgproc.hpp"
+#include <stdio.h>
+
 
 #include <ctime>
 #include <cstdint>
@@ -35,11 +50,17 @@
 #include <memory>
 #include <mutex>
 
+
 using namespace std;
 using namespace cv;
 using namespace cluon;
 
+<<<<<<< accSafeDistance/src/safe-distance.cpp
 static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int followcar, OD4Session *od4, double *prev_area);
+=======
+
+static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int followcar, OD4Session *od4 );
+>>>>>>> accSafeDistance/src/safe-distance.cpp
 static void findSquares( const Mat& image, vector<vector<Point> >& squares );
 static double angle( Point pt1, Point pt2, Point pt0 );
 void countCars(Mat frame, vector<Rect>& rects);
@@ -115,7 +136,8 @@ int32_t main(int32_t argc, char **argv) {
               frame = wrapped.clone();
             }
             sharedMemory->unlock();
-
+            // TODO: Do something with the frame.
+            
             // measure current time; needs to be after frame is copied to shared memory. I think.
             int64_t timestampmicro = cluon::time::toMicroseconds(cluon::time::now());
             int64_t timestampsecs = timestampmicro / 1000000;
@@ -150,7 +172,7 @@ int32_t main(int32_t argc, char **argv) {
             // findSquares(frame_threshold_green, greenSquares);
             // finalFrameGreen = drawSquares(frame_threshold_green, greenSquares, 0, &od4);
 
-             // Display image. For testing.
+             // Display image. For testing recordings only.
             if (VERBOSE) {
             //    imshow("Pink", finalFramePink);
             //    imshow("Green", finalFrameGreen);
