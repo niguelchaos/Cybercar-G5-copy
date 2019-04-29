@@ -51,6 +51,10 @@ void detectAndDisplayStopSign( Mat frame, OD4Session *od4);
 String stopSignCascadeName;
 CascadeClassifier stopSignCascade;
 bool stopSignPresent = false;
+const int lookBackNoOfFrames = 20;
+int NO_OF_STOPSIGNS_REQUIRED = 5;
+int currentIndex = 0;
+bool seenFrameStopsigns[lookBackNoOfFrames] = {false};
 
 int32_t main(int32_t argc, char **argv) {
     int32_t retCode{1};
@@ -143,6 +147,32 @@ int32_t main(int32_t argc, char **argv) {
    return retCode;
 }
 
+//If there is a stop sing in the current frame then it returns a boolean weather 
+//
+bool insertCurrentFrameStopSign(bool stopSignCurrentFrame) {
+
+        seenFrameStopsigns[currentIndex] = stopSignCurrentFrame;
+        currentIndex++;
+        if(currentIndex >= lookBackNoOfFrames) {
+            //Because we don't wanna go outside of the array.
+            currentIndex = 0;
+        }
+        
+        int noOfFramesWithStopsigns = 0; 
+        //Loop over the array and collect all the trues.
+        for(int i = 0; i < lookBackNoOfFrames; i++) {
+            if(seenFrameStopsigns[i]) {
+                noOfFramesWithStopsigns++;
+            }
+        }
+        if(noOfFramesWithStopsigns < NO_OF_STOPSIGNS_REQUIRED) {
+            return false;
+        }
+        else {
+            return true;
+        }
+}
+
 //Haar cascade for Stop sign copied and modified from
 //https://docs.opencv.org/3.4.1/db/d28/tutorial_cascade_classifier.html
 //Classifier gotten from : https://github.com/markgaynor/stopsigns
@@ -158,47 +188,30 @@ void detectAndDisplayStopSign( Mat frame, OD4Session *od4)
     //-- Detect stop signs
     stopSignCascade.detectMultiScale(frame_gray, stopsigns, 1.1, 2, 0|CASCADE_SCALE_IMAGE, Size(60, 60));
     //checks if the stop sign is present in the current frame
-    //
-    if (stopsigns.size() > 0){
+    
         float stopSignArea = 0;
         for (size_t i = 0; i < stopsigns.size(); i++)
         {
             Point center( stopsigns[i].x + stopsigns[i].width/2, stopsigns[i].y + stopsigns[i].height/2 );
             //Draw a circle when recognized
-            ellipse( frame, center, Size( stopsigns[i].width/2, stopsigns[i].height/2 ), 0, 0, 360, Scalar( 255, 0, 255 ), 4, 8, 0 );
+            ellipse( frame, center, Size( stopsigns[i].width/2, stopsigns[i].height/2 ), 0, 0, 360, Scalar( 0, 0, 255 ), 4, 8, 0 );
             Mat faceROI = frame_gray( stopsigns[i] );
             stopSignArea += stopsigns[i].width * stopsigns[i].height;
         }
-        if( stopSignArea > 200 ) {
-            if(stopSignPresent){
-                //DO NOTHING because we already sent the message.
-            } else {
-                stopSignPresent = true;
-                stopSignPresenceUpdate.stopSignPresence(true);
-                std::cout << "sending stop sign detected message: " << std::endl;
+
+        //It compares the previous state with the current one and it reports it if there is a change of state
+            bool valueToReport = insertCurrentFrameStopSign(stopSignArea > 200);
+            if(stopSignPresent != valueToReport){
+                stopSignPresent = valueToReport;
+                stopSignPresenceUpdate.stopSignPresence(valueToReport);
+                if(valueToReport) {
+                    std::cout << "sending stop sign detected message: " << std::endl;
+                } else {
+                    std::cout << "sending NO stop sign present message: " << std::endl;
+                }
                 od4->send(stopSignPresenceUpdate);
             }
-            //This will only apply if the already detected stop sign is far away to send the message for stopping the commandlineArguments
-            //Send a message when the state has changed. It will flood the buss with messages. Only interested when the boolean changes.
-        } else {
-            if(stopSignPresent){
-                std::cout << "sending NO stop sign present message: " << std::endl;
-                //TODO
-                stopSignPresenceUpdate.stopSignPresence(false);
-                od4 -> send(stopSignPresenceUpdate);
-                stopSignPresent = false;
-            }
-        }
-        //if there is not stop sign detected
-    } else {
-        if(stopSignPresent){
-            std::cout << "sending NO stop sign present message: " << std::endl;
-            //TODO
-            stopSignPresenceUpdate.stopSignPresence(false);
-            od4 -> send(stopSignPresenceUpdate);
-            stopSignPresent = false;
-        }
-    }
     // -- Opens a new window with the Stop sign recognition on
     imshow( "stopSign", frame );
 }
+
