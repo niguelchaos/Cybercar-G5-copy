@@ -47,107 +47,97 @@ void checkCarPosition(double centerX, OD4Session *od4) ;
 void checkCarDistance(double *prev_area, double area, double centerY, OD4Session *od4);
 
 int32_t main(int32_t argc, char **argv) {
-    int32_t retCode{1};
-    auto commandlineArguments = cluon::getCommandlineArguments(argc, argv);
-    if ( (0 == commandlineArguments.count("cid")) ||
-         (0 == commandlineArguments.count("name")) ||
-         (0 == commandlineArguments.count("width")) ||
-         (0 == commandlineArguments.count("height")) ) {
-        std::cerr << argv[0] << " attaches to a shared memory area containing an ARGB image." << std::endl;
-        std::cerr << "Usage:   " << argv[0] << " --cid=<OD4 session> --name=<name of shared memory area> [--verbose]" << std::endl;
-        std::cerr << "         --cid:    CID of the OD4Session to send and receive messages" << std::endl;
-        std::cerr << "         --name:   name of the shared memory area to attach" << std::endl;
-        std::cerr << "         --width:  width of the frame" << std::endl;
-        std::cerr << "         --height: height of the frame" << std::endl;
-        std::cerr << "Example: " << argv[0] << " --cid=112 --name=img.i420 --width=640 --height=480" << std::endl;
-    }
-    else {
-        const std::string NAME{commandlineArguments["name"]};
-        const uint32_t WIDTH{static_cast<uint32_t>(std::stoi(commandlineArguments["width"]))};
-        const uint32_t HEIGHT{static_cast<uint32_t>(std::stoi(commandlineArguments["height"]))};
-        const bool VERBOSE{commandlineArguments.count("verbose") != 0};
+   int32_t retCode{1};
+   auto commandlineArguments = cluon::getCommandlineArguments(argc, argv);
+   if((0 == commandlineArguments.count("cid")) ||
+      (0 == commandlineArguments.count("name")) ||
+      (0 == commandlineArguments.count("width")) ||
+      (0 == commandlineArguments.count("height")) ) {
+      std::cerr << argv[0] << " attaches to a shared memory area containing an ARGB image." << std::endl;
+      std::cerr << "Usage:   " << argv[0] << " --cid=<OD4 session> --name=<name of shared memory area> [--verbose]" << std::endl;
+      std::cerr << "         --cid:    CID of the OD4Session to send and receive messages" << std::endl;
+      std::cerr << "         --name:   name of the shared memory area to attach" << std::endl;
+      std::cerr << "         --width:  width of the frame" << std::endl;
+      std::cerr << "         --height: height of the frame" << std::endl;
+      std::cerr << "Example: " << argv[0] << " --cid=112 --name=img.i420 --width=640 --height=480" << std::endl;
+   } else {
+      const std::string NAME{commandlineArguments["name"]};
+      const uint32_t WIDTH{static_cast<uint32_t>(std::stoi(commandlineArguments["width"]))};
+      const uint32_t HEIGHT{static_cast<uint32_t>(std::stoi(commandlineArguments["height"]))};
+      const bool VERBOSE{commandlineArguments.count("verbose") != 0};
 
-        // Attach to the shared memory.
-        std::unique_ptr<cluon::SharedMemory> sharedMemory{new cluon::SharedMemory{NAME}};
-        if (sharedMemory && sharedMemory->valid()) {
-            std::clog << argv[0] << ": Attached to shared memory '" << sharedMemory->name() << " (" << sharedMemory->size() << " bytes)." << std::endl;
+      // Attach to the shared memory.
+      std::unique_ptr<cluon::SharedMemory> sharedMemory{new cluon::SharedMemory{NAME}};
+      if (sharedMemory && sharedMemory->valid()) {
+         std::clog << argv[0] << ": Attached to shared memory '" << sharedMemory->name() << " (" << sharedMemory->size() << " bytes)." << std::endl;
 
-            // Interface to a running OpenDaVINCI session; here, you can send and receive messages.
-            cluon::OD4Session od4{static_cast<uint16_t>(std::stoi(commandlineArguments["cid"]))};
+         // Interface to a running OpenDaVINCI session; here, you can send and receive messages.
+         cluon::OD4Session od4{static_cast<uint16_t>(std::stoi(commandlineArguments["cid"]))};
 
-            // Measure beginning time
-            int64_t starttimestampmicro = cluon::time::toMicroseconds(cluon::time::now());
-            int64_t starttimestampsecs = starttimestampmicro / 1000000;
-            cout << "Starting Timestamp: " << starttimestampsecs << endl;
+         // Measure beginning time
+         int64_t starttimestampmicro = cluon::time::toMicroseconds(cluon::time::now());
+         int64_t starttimestampsecs = starttimestampmicro / 1000000;
+         cout << "Starting Timestamp: " << starttimestampsecs << endl;
 
-            int64_t prevtimestampsecs = 0;
-            int framecounter = 0;
+         int64_t prevtimestampsecs = 0;
+         int framecounter = 0;
 
-            double prev_area = 0; // used to determine whether car is moving
+         double prev_area = 0; // used to determine whether car is moving and amount of acceleration
 
-            // Endless loop; end the program by pressing Ctrl-C.
+         // Endless loop; end the program by pressing Ctrl-C.
          while (od4.isRunning()) {
-             Mat frame;
-             Mat frame_HSV;
-             Mat frame_gray;
-             Mat cropped_frame;
-             Mat frame_threshold_pink;
-             Mat frame_threshold_green;
-             Mat finalFramePink;
-             Mat finalFrameGreen;
-             vector<vector<Point> > pinkSquares;
-             vector<vector<Point> > greenSquares;
+            Mat frame;
+            Mat frame_HSV;
+            Mat frame_gray;
+            Mat cropped_frame;
+            Mat frame_threshold_pink;
+            Mat frame_threshold_green;
+            Mat finalFramePink;
+            Mat finalFrameGreen;
+            vector<vector<Point> > pinkSquares;
+            vector<vector<Point> > greenSquares;
 
-             const int max_value_H = 360/2;
-             const int max_value = 255;
+            const int max_value_H = 360/2;
+            const int max_value = 255;
 
+            // Wait for a notification of a new frame.
+            sharedMemory->wait();
 
-             // Wait for a notification of a new frame.
-             sharedMemory->wait();
+            // Lock the shared memory.
+            sharedMemory->lock();
+            {
+              // Copy image into cvMat structure.
+              // Be aware of that any code between lock/unlock is blocking
+              // the camera to provide the next frame. Thus, any
+              // computationally heavy algorithms should be placed outside
+              // lock/unlock.
+              cv::Mat wrapped(HEIGHT, WIDTH, CV_8UC4, sharedMemory->data());
+              frame = wrapped.clone();
+            }
+            sharedMemory->unlock();
 
-             // Lock the shared memory.
-             sharedMemory->lock();
-             {
-                 // Copy image into cvMat structure.
-                 // Be aware of that any code between lock/unlock is blocking
-                 // the camera to provide the next frame. Thus, any
-                 // computationally heavy algorithms should be placed outside
-                 // lock/unlock.
-                 cv::Mat wrapped(HEIGHT, WIDTH, CV_8UC4, sharedMemory->data());
-                 frame = wrapped.clone();
-             }
-             sharedMemory->unlock();
+            // measure current time; needs to be after frame is copied to shared memory. I think.
+            int64_t timestampmicro = cluon::time::toMicroseconds(cluon::time::now());
+            int64_t timestampsecs = timestampmicro / 1000000;
 
-             // measure current time; needs to be after frame is copied to shared memory. I think.
+         // Pink
+            int low_H_pink = 135;
+            int low_S_pink = 50;
+            int low_V_pink = 65;
+            int high_H_pink = max_value_H;
+            int high_S_pink = max_value;
+            int high_V_pink = max_value;
 
-             int64_t timestampmicro = cluon::time::toMicroseconds(cluon::time::now());
-             int64_t timestampsecs = timestampmicro / 1000000;
+         // Green
+            // int low_H_green = 42;
+            // int low_S_green = 18;
+            // int low_V_green = 102;
+            // int high_H_green = 92;
+            // int high_S_green = 182;
+            // int high_V_green = 255;
 
-
-             // TODO: Do something with the frame.
-             // HelloWorld helloworld;
-             // helloworld.helloworld("Hello world from camera safe distance checker gweh");
-             // od4.send(helloworld);
-             // cout << "sent helloworld" <<"\n";
-
-             // Pink
-               int low_H_pink = 135;
-               int low_S_pink = 50;
-               int low_V_pink = 65;
-               int high_H_pink = max_value_H;
-               int high_S_pink = max_value;
-               int high_V_pink = max_value;
-
-            // Green
-               // int low_H_green = 42;
-               // int low_S_green = 18;
-               // int low_V_green = 102;
-               // int high_H_green = 92;
-               // int high_S_green = 182;
-               // int high_V_green = 255;
-
+            // Crop the frame to get useful stuff
             frame(Rect(Point(0, 0), Point(640, 370))).copyTo(cropped_frame);
-
             // Convert from BGR to HSV colorspace
             cvtColor(cropped_frame, frame_HSV, COLOR_RGB2HSV);
             // Detect the object based on HSV Range Values
@@ -160,7 +150,7 @@ int32_t main(int32_t argc, char **argv) {
             // findSquares(frame_threshold_green, greenSquares);
             // finalFrameGreen = drawSquares(frame_threshold_green, greenSquares, 0, &od4);
 
-             // Display image.
+             // Display image. For testing.
             if (VERBOSE) {
             //    imshow("Pink", finalFramePink);
             //    imshow("Green", finalFrameGreen);
@@ -186,40 +176,36 @@ int32_t main(int32_t argc, char **argv) {
  * from pt0->pt1 and pt0->pt2
  */
 static double angle(cv::Point pt1, cv::Point pt2, cv::Point pt0) {
-    double dx1 = pt1.x - pt0.x;
-    double dy1 = pt1.y - pt0.y;
-    double dx2 = pt2.x - pt0.x;
-    double dy2 = pt2.y - pt0.y;
-    return (dx1*dx2 + dy1*dy2)/sqrt((dx1*dx1 + dy1*dy1)*(dx2*dx2 + dy2*dy2) + 1e-10);
+   double dx1 = pt1.x - pt0.x;
+   double dy1 = pt1.y - pt0.y;
+   double dx2 = pt2.x - pt0.x;
+   double dy2 = pt2.y - pt0.y;
+   return (dx1*dx2 + dy1*dy2)/sqrt((dx1*dx1 + dy1*dy1)*(dx2*dx2 + dy2*dy2) + 1e-10);
 }
 
 // returns sequence of squares detected on the image.
-static void findSquares( const Mat& image, vector<vector<Point> >& squares )
-{
+static void findSquares( const Mat& image, vector<vector<Point> >& squares ) {
    int thresh = 50, N = 11;
-    squares.clear();
+   squares.clear();
 
-    Mat pyr, timg, gray0(image.size(), CV_8U), gray;
+   Mat pyr, timg, gray0(image.size(), CV_8U), gray;
 
-    // down-scale and upscale the image to filter out the noise
-    // blur works too.
-    pyrDown(image, pyr, Size(image.cols/2, image.rows/2));
-    pyrUp(pyr, timg, image.size());
-    vector<vector<Point> > contours;
+   // down-scale and upscale the image to filter out the noise
+   // blur works too.
+   pyrDown(image, pyr, Size(image.cols/2, image.rows/2));
+   pyrUp(pyr, timg, image.size());
+   vector<vector<Point> > contours;
 
    // find squares in every color plane of the image
-   for( int c = 0; c < 1; c++ )
-   {
+   for( int c = 0; c < 1; c++ ) {
       int ch[] = {c, 0};
       mixChannels(&timg, 1, &gray0, 1, ch, 1);
 
-     // try several threshold levels
-     for( int l = 0; l < N; l++ )
-     {
+      // try several threshold levels
+      for( int l = 0; l < N; l++ ) {
          // hack: use Canny instead of zero threshold level.
          // Canny helps to catch squares with gradient shading
-         if( l == 0 )
-         {
+         if( l == 0 ) {
              // apply Canny. Take the upper threshold from slider
              // and set the lower to 0 (which forces edges merging)
              Canny(gray0, gray, 0, thresh, 5);
@@ -227,8 +213,7 @@ static void findSquares( const Mat& image, vector<vector<Point> >& squares )
              // holes between edge segments
              dilate(gray, gray, Mat(), Point(-1,-1));
          }
-         else
-         {
+         else {
              // apply threshold if l!=0:
              //     tgray(x,y) = gray(x,y) < (l+1)*255/N ? 255 : 0
              // 255 is max saturation/value. N is just a thresh level.
@@ -241,40 +226,36 @@ static void findSquares( const Mat& image, vector<vector<Point> >& squares )
          vector<Point> approx;
 
          // test each contour
-         for( size_t i = 0; i < contours.size(); i++ )
-         {
-             // approximate contour with accuracy proportional
-             // to the contour perimeter
-             approxPolyDP(contours[i], approx, arcLength(contours[i], true)*0.02, true);
+         for( size_t i = 0; i < contours.size(); i++ ) {
+            // approximate contour with accuracy proportional
+            // to the contour perimeter
+            approxPolyDP(contours[i], approx, arcLength(contours[i], true)*0.02, true);
 
-             // square contours should have 4 vertices after approximation
-             // relatively large area (to filter out noisy contours)
-             // and be convex.
-             // Note: absolute value (fabs) of an area is used because
-             // area may be positive or negative - in accordance with the
-             // contour orientation
-            if( approx.size() == 4 &&
-            fabs(contourArea(approx)) > 1000 &&
+            // square contours should have 4 vertices after approximation
+            // relatively large area (to filter out noisy contours)
+            // and be convex.
+            // Note: absolute value (fabs) of an area is used because
+            // area may be positive or negative - in accordance with the
+            // contour orientation
+
+            if( approx.size() == 4 && // if there are 4 sides...
+            fabs(contourArea(approx)) > 1000 && // and the square is big enough...
             fabs(contourArea(approx)) < 200000 &&
-            isContourConvex(approx) ) {
+            isContourConvex(approx) ) { // and square is convex...
 
+               double maxCosine = 0;
+               for( int j = 2; j < 5; j++ ) {
+                  // find the maximum cosine of the angle between joint edges
+                  double cosine = fabs(angle(approx[j%4], approx[j-2], approx[j-1]));
+                  maxCosine = MAX(maxCosine, cosine);
+               }
 
-            double maxCosine = 0;
-            // double area = contourArea(approx);
-            for( int j = 2; j < 5; j++ )
-            {
-               // find the maximum cosine of the angle between joint edges
-               double cosine = fabs(angle(approx[j%4], approx[j-2], approx[j-1]));
-               maxCosine = MAX(maxCosine, cosine);
-            }
-
-            // if cosines of all angles are small
-            // (all angles are ~90 degree) then write quandrange (square)
-            // vertices to resultant sequence
-            if( maxCosine < 0.25 ) {
-               // cout << "Is rectangle. \n";
-               squares.push_back(approx);
-            }
+               // if cosines of all angles are small
+               // (all angles are ~90 degree) then its a square/rectangle.
+               // push the vertices to resultant sequence(array)
+               if( maxCosine < 0.25 ) {
+                  squares.push_back(approx);
+               }
             }
          }
       }
@@ -282,14 +263,7 @@ static void findSquares( const Mat& image, vector<vector<Point> >& squares )
 }
 
 void checkCarDistance(double *prev_area, double area, double centerY, OD4Session *od4) {
-   // SpeedUp speed_up;
-   // SpeedDown speed_down;
-   // float hard_accel = 1;
-   // float soft_accel = 0.5f;
-   // float soft_brake = -0.5f;
-   // float hard_brake = -1;
-
-// PID controller test
+// PID controller
 // https://robotics.stackexchange.com/questions/9786/how-do-the-pid-parameters-kp-ki-and-kd-affect-the-heading-of-a-differential
    SpeedCorrectionRequest speed_correction;
 
@@ -303,71 +277,33 @@ void checkCarDistance(double *prev_area, double area, double centerY, OD4Session
       cout << "// Area diff: " << area_diff << "//    ";
       cout << "New Optimal Area: " << optimal_area << "//" << endl;
    }
-   // float time_interval = 0.05f;
+
+// the Integral and Derivative was not used due to time constraints.
    float error = optimal_area - (float) area;
-   float kp = 1; // proportional gain constant, tunes controller.
-   // float ki = 1.1;
-   // float kd = 1;
-   // float integral += error * time_interval // integral estimates future error.
-   // float derivative = (error - prev_error) / time_interval // looks at past error values
-   // prev_error = error;
-   float output = kp * error; // Ki * integral + Kd * derivative
-   float correction_speed; // pedal only accepts 0 - 1, need to modify correction to suit it.
-   if (output > 0) {
-      correction_speed = output / 900000;
-   }
-   if (output < 0) {
-      correction_speed = output / 100000;
-   }
+   float kp = 1; // proportional gain constant, tunes controller. In our case, we have it as 1 to make it balanced.
+   float output = kp * error;
+   float correction_speed;
+   // braking needs to be stronger than accelerating, need to modify correction to suit it.
+   if (output > 0) { correction_speed = output / 900000; }
+   if (output < 0) { correction_speed = output / 100000; }
 
-///////////////////////////// Absolute PID controller //////////////////////
-   // float kp = 1; // proportional gain constant, tunes controller.
-   // float output = kp * error; // Ki * integral + Kd * derivative
-   // float correction_speed = output / 22900; // dividing it makes max output < 0.4 and > -0.4.
-///////////////////////////////////////////////////////////////////////////////
+// braking needs to be faster than accelerating. I dont care.
+   if (correction_speed < 0) { correction_speed = correction_speed * 5; } // hard multiplier by 5
 
-   if (correction_speed < 0) { // braking needs to be faster than accelerating. I dont care.
-      correction_speed = correction_speed * 5; // hard multiplier of braking speed
-   }
-
-
-///////////////////////////// hard coded speed correction ///////////////////////
    cout << " [[ area: " << area << " ]]";
    cout << "  // [[center Y: " << centerY << " ]] // ";
    cout << " // [ speed correction : " << correction_speed << " ] // " << endl;
 
-   /////////////////////// PID controller ///////////////////////
    speed_correction.amount(correction_speed);
    od4->send(speed_correction);
 }
 
 void checkCarPosition(double centerX, OD4Session *od4) {
-   int frame_center = 320;
-   // float offset = 40;
-   // float hard_offset = 2.5f * offset;
-
-   // MoveRight move_right;
-   // MoveLeft move_left;
-
-   // positive steer = left, negative = right
-   // float hard_left = 1;
-   // float left = 0.5f;
-   // float right = -0.5f;
-   // float hard_right = -1;
-
+   int frame_center = 320; // Setpoint - we want the car to ideally be in center.
 // PID controller test
 // https://robotics.stackexchange.com/questions/9786/how-do-the-pid-parameters-kp-ki-and-kd-affect-the-heading-of-a-differential
    SteeringCorrectionRequest steering_correction;
    float error = frame_center - (float) centerX;
-   // float time_interval = 0.05f;
-   // float kp = 1.1f; // proportional gain constant, tunes controller.
-   // float ki = 1.1;
-   // float kd = 1;
-   // float integral += error * time_interval // integral estimates future error.
-   // float derivative = (error - prev_error) / time_interval // looks at past error values
-   // prev_error = error;
-   // float output = kp * error; // Ki * integral + Kd * derivative
-   // float correction_angle = output / 1000; // because groundsteering accepts 0 - 0.5 around
 
 //////////////////////// Absolute pid steering correction ////////////////////
    float kp = 1;
@@ -383,7 +319,8 @@ void checkCarPosition(double centerX, OD4Session *od4) {
 }
 
 // the function draws all the squares in the image
-static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int followcar, OD4Session *od4, double *prev_area) // 0 = pink/other car, 1 = green/acc car
+// followcar variable - 0 = pink/other car, 1 = green/acc car
+static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int followcar, OD4Session *od4, double *prev_area)
 {
    Scalar color = Scalar(255,0,0 );
    vector<Rect> boundRects( squares.size() );
@@ -391,17 +328,15 @@ static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int f
    int group_thresh = 1;
    double merge_box_diff = 0.6;
 
-   for( size_t i = 0; i < squares.size(); i++ )
-   {
+   for( size_t i = 0; i < squares.size(); i++ ) {
       // Code from http://answers.opencv.org/question/72237/measuring-width-height-of-bounding-box/
       boundRects[i] = boundingRect(squares[i]);
       rectangle(image, boundRects[i].tl(), boundRects[i].br(), color, 2 );
-
-      // we want the highest resolution possible for detecting acc car's position.
    }
 
    groupRectangles(boundRects, group_thresh, merge_box_diff);  //group overlapping rectangles into 1
 
+   // only check distance and steering corrections, along with number of cars, after merging.
    for (size_t i = 0; i < boundRects.size(); i++) {
       int rect_x = boundRects[i].x;
       int rect_y = boundRects[i].y;
@@ -418,12 +353,12 @@ static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int f
       Point bot_left(rect_x, rect_y + rect_height);
       Point bot_right(rect_x + rect_width, rect_y + rect_height);
 
-      if (followcar == 0) { // if not, they are other cars.
+      if (followcar == 0) {   // if 0, they are other cars.
          // if not car we are following, they are other cars. count them.
          countCars(image, boundRects);
       }
 
-      if (followcar == 1) { // 1 = if car is the one we are following, check position and distance
+      if (followcar == 1) {   // 1 = if car is the one we are following, check position and distance
         checkCarDistance( prev_area, rect_area, rect_centerY, od4);
         checkCarPosition( rect_centerX, od4);
         *prev_area = rect_area; // remember this frame's area for the next frame
