@@ -1,3 +1,0 @@
-/home/nora/gitrepos/group_05/colorTracker/build/CMakeFiles/rebuild_cache.dir
-/home/nora/gitrepos/group_05/colorTracker/build/CMakeFiles/colortracker.dir
-/home/nora/gitrepos/group_05/colorTracker/build/CMakeFiles/edit_cache.dir

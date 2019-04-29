@@ -110,42 +110,67 @@ int32_t main(int32_t argc, char **argv) {
       float currentDistance{0.0};
       auto onFrontDistanceReading{ [&od4, SAFETYDISTANCE, VERBOSE, &currentDistance](cluon::data::Envelope &&envelope)
       { // &<variables> will be captured by reference (instead of value only)
-			if (!stopCarSent) {
-		      auto msg = cluon::extractMessage<opendlv::proxy::DistanceReading>(std::move(envelope));
-				// senderStamp 0 corresponds to front ultra-sound distance sensor
-		      const uint16_t senderStamp = envelope.senderStamp();
-		      currentDistance = msg.distance(); // Get the distance
+	      auto msg = cluon::extractMessage<opendlv::proxy::DistanceReading>(std::move(envelope));
+			// senderStamp 0 corresponds to front ultra-sound distance sensor
+	      const uint16_t senderStamp = envelope.senderStamp();
+	      currentDistance = msg.distance(); // Get the distance
 
-			// proceed only if senderStamp is 0 (front sensor)
-				if(senderStamp == 0) {
-					if (VERBOSE) {
-		            // std::cout << "Received DistanceReading message (senderStamp=" << senderStamp << "): " << currentDistance << std::endl;
-		        	}
-					if (currentDistance <= SAFETYDISTANCE) {
-					StopCar(od4, VERBOSE); // Stop the car if obstacle is too close
-					currentCarSpeed = 0.0;
-					currentSteering = 0.0; // reset wheels too just in case
-					SetSteering(od4, currentSteering, VERBOSE);
-					std::cout << "Obstacle too close: " << currentDistance << std::endl;
-					}
+		// proceed only if senderStamp is 0 (front sensor)
+			if(senderStamp == 0) {
+				if (VERBOSE) {
+	            // std::cout << "Received DistanceReading message (senderStamp=" << senderStamp << "): " << currentDistance << std::endl;
+	        	}
+				if (currentDistance <= SAFETYDISTANCE) {
+				StopCar(od4, VERBOSE); // Stop the car if obstacle is too close
+				currentCarSpeed = 0.0;
+				currentSteering = 0.0; // reset wheels too just in case
+				SetSteering(od4, currentSteering, VERBOSE);
+				std::cout << "Obstacle too close: " << currentDistance << std::endl;
 				}
 			}
-      }
+       }
    };
 	od4.dataTrigger(opendlv::proxy::DistanceReading::ID(), onFrontDistanceReading);
 
 		// Receive StopCar message and stops the car. This is reaction on stop sign detection
-		auto onStopCar{ [&od4, VERBOSE](cluon::data::Envelope&&) {
-			if (!stopCarSent) {
-				if (VERBOSE) {
-					std::cout << "Received Stop car message: " << std::endl;
-				}
-				stopCarSent = true;
-				StopCar(od4, VERBOSE);
+// 		auto onStopCar{ [&od4, VERBOSE](cluon::data::Envelope&&) {
+// 			if (!stopCarSent) {
+// 				if (VERBOSE) {
+// 					std::cout << "Received Stop car message: " << std::endl;
+// 				}
+// 				stopCarSent = true;
+// 				StopCar(od4, VERBOSE);
+// 			}
+// 		}
+// 	};
+//   od4.dataTrigger(StopCarRequest::ID(), onStopCar);
+   
+   	//Bool messages for stopping the car
+	auto onStopCar{[&od4, VERBOSE](cluon::data::Envelope &&envelope)
+    {
+		//if (!stopCarSent) {
+		auto msg = cluon::extractMessage<StopSignPresenceUpdate>(std::move(envelope));
+		bool stopSignPresence = msg.stopSignPresence(); // Get the bool
+
+			if (VERBOSE)
+			{
+		    		std::cout << "Received Stop car message: " << std::endl;
 			}
-		}
-	};
-   od4.dataTrigger(StopCarRequest::ID(), onStopCar);
+
+			if (stopSignPresence==true){
+
+			stopCarSent = true;
+			StopCar(od4, VERBOSE);
+			}
+
+			if (stopSignPresence==false){
+			MoveForward (od4, 0.13, VERBOSE);
+			}
+		//}
+	    }
+        };
+        od4.dataTrigger(StopSignPresenceUpdate::ID(), onStopCar);
+
 
 // [Relative PID for speed correction]
 	auto onSpeedCorrection{[&od4, VERBOSE, STARTSPEED, MAXSPEED](cluon::data::Envelope &&envelope)
@@ -184,7 +209,7 @@ int32_t main(int32_t argc, char **argv) {
 
 			// check if...
 			if (amount >= -0.05 && amount < 0.05 && // and acc car is relatively in front...
-				(currentSteering <= -0.05 || currentSteering > 0.05) && // and wheels are not straight...
+			    (currentSteering <= -0.05 || currentSteering > 0.05) && // and wheels are not straight...
 				currentCarSpeed < STARTSPEED - 0.05) // and car is stopped...
 			{
 				currentSteering = 0; // ...then reset wheels
@@ -201,10 +226,47 @@ int32_t main(int32_t argc, char **argv) {
 };
 
 // triggers - ordering is probably important
-      od4.dataTrigger(SteeringCorrectionRequest::ID(), onSteeringCorrection); //check steering correction first
-		od4.dataTrigger(SpeedCorrectionRequest::ID(), onSpeedCorrection);
+        od4.dataTrigger(SteeringCorrectionRequest::ID(), onSteeringCorrection); //check steering correction first
+	    od4.dataTrigger(SpeedCorrectionRequest::ID(), onSpeedCorrection);
+	
+        while(od4.isRunning()) {
+// only sends messages
 
-		while(od4.isRunning()) {}
+		/*HelloWorld helloWorld;
+		helloWorld.helloWorld("i HATE CAR");
+		od4.send(helloWorld);
+		if (VERBOSE) std::cout << "Hello World sent (i HATE CAR)" << std::endl;
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+	
+		SpeedCorrectionRequest speedCorrection;
+		speedCorrection.amount(1);
+		od4.send(speedCorrection);
+
+		std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+
+		SteeringCorrectionRequest steeringCorrection;
+		steeringCorrection.amount(-1);
+		od4.send(steeringCorrection);
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+		
+		StopCarRequest stopCar;
+		od4.send(stopCar);
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+
+		SpeedCorrectionRequest speedCorrection2;
+		speedCorrection2.amount(-1);
+		od4.send(speedCorrection2);
+
+		
+		StopSignPresenceUpdate stopSign;
+		stopSign.stopSignPresence(true);
+		od4.send(stopSign);*/
+
+	/*if (!stopCarSent){
+	MoveForward (od4, 0.13, VERBOSE);
+	}*/
 		return 0;
 	}
 }
