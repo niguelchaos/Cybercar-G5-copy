@@ -39,7 +39,7 @@ using namespace std;
 using namespace cv;
 using namespace cluon;
 
-static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int followcar, OD4Session *od4, double *prev_area );
+static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int followcar, OD4Session *od4, double *prev_area);
 static void findSquares( const Mat& image, vector<vector<Point> >& squares );
 static double angle( Point pt1, Point pt2, Point pt0 );
 void countCars(Mat frame, vector<Rect>& rects);
@@ -80,6 +80,11 @@ int32_t main(int32_t argc, char **argv) {
             int64_t starttimestampsecs = starttimestampmicro / 1000000;
             cout << "Starting Timestamp: " << starttimestampsecs << endl;
 
+            int64_t prevtimestampsecs = 0;
+            int framecounter = 0;
+
+            double prev_area = 0; // used to determine whether car is moving
+
             // Endless loop; end the program by pressing Ctrl-C.
          while (od4.isRunning()) {
              Mat frame;
@@ -92,8 +97,6 @@ int32_t main(int32_t argc, char **argv) {
              Mat finalFrameGreen;
              vector<vector<Point> > pinkSquares;
              vector<vector<Point> > greenSquares;
-
-             double *prev_area; // used to determine whether car is moving
 
              const int max_value_H = 360/2;
              const int max_value = 255;
@@ -116,11 +119,11 @@ int32_t main(int32_t argc, char **argv) {
              sharedMemory->unlock();
 
              // measure current time; needs to be after frame is copied to shared memory. I think.
-             int64_t prevtimestampsecs;
+
              int64_t timestampmicro = cluon::time::toMicroseconds(cluon::time::now());
              int64_t timestampsecs = timestampmicro / 1000000;
 
-             int framecounter;
+
              // TODO: Do something with the frame.
              // HelloWorld helloworld;
              // helloworld.helloworld("Hello world from camera safe distance checker gweh");
@@ -136,12 +139,12 @@ int32_t main(int32_t argc, char **argv) {
                int high_V_pink = max_value;
 
             // Green
-               int low_H_green = 42;
-               int low_S_green = 18;
-               int low_V_green = 102;
-               int high_H_green = 92;
-               int high_S_green = 182;
-               int high_V_green = 255;
+               // int low_H_green = 42;
+               // int low_S_green = 18;
+               // int low_V_green = 102;
+               // int high_H_green = 92;
+               // int high_S_green = 182;
+               // int high_V_green = 255;
 
             frame(Rect(Point(0, 0), Point(640, 370))).copyTo(cropped_frame);
 
@@ -149,19 +152,19 @@ int32_t main(int32_t argc, char **argv) {
             cvtColor(cropped_frame, frame_HSV, COLOR_RGB2HSV);
             // Detect the object based on HSV Range Values
             inRange(frame_HSV, Scalar(low_H_pink, low_S_pink, low_V_pink), Scalar(high_H_pink, high_S_pink, high_V_pink), frame_threshold_pink);
-            inRange(frame_HSV, Scalar(low_H_green, low_S_green, low_V_green), Scalar(high_H_green, high_S_green, high_V_green), frame_threshold_green);
+            // inRange(frame_HSV, Scalar(low_H_green, low_S_green, low_V_green), Scalar(high_H_green, high_S_green, high_V_green), frame_threshold_green);
 
             findSquares(frame_threshold_pink, pinkSquares);
-            finalFramePink = drawSquares(frame_threshold_pink, pinkSquares, 1, &od4, prev_area); // pass reference of prev_area
+            finalFramePink = drawSquares(frame_threshold_pink, pinkSquares, 1, &od4, &prev_area); // pass reference of prev_area
 
-            findSquares(frame_threshold_green, greenSquares);
-            finalFrameGreen = drawSquares(frame_threshold_green, greenSquares, 0, &od4, prev_area);
+            // findSquares(frame_threshold_green, greenSquares);
+            // finalFrameGreen = drawSquares(frame_threshold_green, greenSquares, 0, &od4);
 
              // Display image.
             if (VERBOSE) {
-               imshow("Pink", finalFramePink);
-               imshow("Green", finalFrameGreen);
-               cv::waitKey(1);
+            //    imshow("Pink", finalFramePink);
+            //    imshow("Green", finalFrameGreen);
+            //    cv::waitKey(1);
             }
 
             // measures FPS
@@ -278,7 +281,7 @@ static void findSquares( const Mat& image, vector<vector<Point> >& squares )
    }
 }
 
-void checkCarDistance(double *prev_area, double area, double centerY, OD4Session *od4) { // dereference prev_area here
+void checkCarDistance(double *prev_area, double area, double centerY, OD4Session *od4) {
    // SpeedUp speed_up;
    // SpeedDown speed_down;
    // float hard_accel = 1;
@@ -291,12 +294,14 @@ void checkCarDistance(double *prev_area, double area, double centerY, OD4Session
    SpeedCorrectionRequest speed_correction;
 
    float optimal_area = 8000; // default optimal area
-   float area_diff = (float)area - (float) *prev_area; // looks at how much car has accelerated/deccelerateds
+   float area_diff = (float)area - (float) *prev_area; // looks at how much car has accelerated/deccelerated
 
    if (area_diff > 100) {
       // make optimal area farther(smaller) if the car has accelerated a lot to brake earlier and harder.
       // small differences dont make much of a difference - deals with large variations of area
       optimal_area = optimal_area - area_diff;
+      cout << "// Area diff: " << area_diff << "//    ";
+      cout << "New Optimal Area: " << optimal_area << "//" << endl;
    }
    // float time_interval = 0.05f;
    float error = optimal_area - (float) area;
@@ -307,7 +312,13 @@ void checkCarDistance(double *prev_area, double area, double centerY, OD4Session
    // float derivative = (error - prev_error) / time_interval // looks at past error values
    // prev_error = error;
    float output = kp * error; // Ki * integral + Kd * derivative
-   float correction_speed = output / 900000; // pedal only accepts 0 - 1, need to modify correction to suit it.
+   float correction_speed; // pedal only accepts 0 - 1, need to modify correction to suit it.
+   if (output > 0) {
+      correction_speed = output / 900000;
+   }
+   if (output < 0) {
+      correction_speed = output / 100000;
+   }
 
 ///////////////////////////// Absolute PID controller //////////////////////
    // float kp = 1; // proportional gain constant, tunes controller.
@@ -316,7 +327,7 @@ void checkCarDistance(double *prev_area, double area, double centerY, OD4Session
 ///////////////////////////////////////////////////////////////////////////////
 
    if (correction_speed < 0) { // braking needs to be faster than accelerating. I dont care.
-      correction_speed = correction_speed * 2; // hard double of braking speed
+      correction_speed = correction_speed * 5; // hard multiplier of braking speed
    }
 
 
@@ -413,7 +424,7 @@ static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int f
       }
 
       if (followcar == 1) { // 1 = if car is the one we are following, check position and distance
-        checkCarDistance( prev_area, rect_area, rect_centerY, od4); // again, pass prev_area reference
+        checkCarDistance( prev_area, rect_area, rect_centerY, od4);
         checkCarPosition( rect_centerX, od4);
         *prev_area = rect_area; // remember this frame's area for the next frame
       }
