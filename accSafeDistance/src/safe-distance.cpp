@@ -55,12 +55,7 @@ using namespace std;
 using namespace cv;
 using namespace cluon;
 
-<<<<<<< accSafeDistance/src/safe-distance.cpp
 static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int followcar, OD4Session *od4, double *prev_area);
-=======
-
-static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int followcar, OD4Session *od4 );
->>>>>>> accSafeDistance/src/safe-distance.cpp
 static void findSquares( const Mat& image, vector<vector<Point> >& squares );
 static double angle( Point pt1, Point pt2, Point pt0 );
 void countCars(Mat frame, vector<Rect>& rects);
@@ -137,7 +132,7 @@ int32_t main(int32_t argc, char **argv) {
             }
             sharedMemory->unlock();
             // TODO: Do something with the frame.
-            
+
             // measure current time; needs to be after frame is copied to shared memory. I think.
             int64_t timestampmicro = cluon::time::toMicroseconds(cluon::time::now());
             int64_t timestampsecs = timestampmicro / 1000000;
@@ -307,10 +302,10 @@ void checkCarDistance(double *prev_area, double area, double centerY, OD4Session
    float correction_speed;
    // braking needs to be stronger than accelerating, need to modify correction to suit it.
    if (output > 0) { correction_speed = output / 900000; }
-   if (output < 0) { correction_speed = output / 100000; }
+   if (output <= 0) { correction_speed = output / 100000; }
 
 // braking needs to be faster than accelerating. I dont care.
-   if (correction_speed < 0) { correction_speed = correction_speed * 5; } // hard multiplier by 5
+   if (correction_speed <= 0) { correction_speed = correction_speed * 5; } // hard multiplier by 5
 
    cout << " [[ area: " << area << " ]]";
    cout << "  // [[center Y: " << centerY << " ]] // ";

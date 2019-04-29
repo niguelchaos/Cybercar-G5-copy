@@ -144,7 +144,7 @@ int32_t main(int32_t argc, char **argv) {
 // 		}
 // 	};
 //   od4.dataTrigger(StopCarRequest::ID(), onStopCar);
-   
+
    	//Bool messages for stopping the car
 	auto onStopCar{[&od4, VERBOSE](cluon::data::Envelope &&envelope)
     {
@@ -226,9 +226,9 @@ int32_t main(int32_t argc, char **argv) {
 };
 
 // triggers - ordering is probably important
-        od4.dataTrigger(SteeringCorrectionRequest::ID(), onSteeringCorrection); //check steering correction first
+       od4.dataTrigger(SteeringCorrectionRequest::ID(), onSteeringCorrection); //check steering correction first
 	    od4.dataTrigger(SpeedCorrectionRequest::ID(), onSpeedCorrection);
-	
+
         while(od4.isRunning()) {
 // only sends messages
 
@@ -237,7 +237,7 @@ int32_t main(int32_t argc, char **argv) {
 		od4.send(helloWorld);
 		if (VERBOSE) std::cout << "Hello World sent (i HATE CAR)" << std::endl;
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-	
+
 		SpeedCorrectionRequest speedCorrection;
 		speedCorrection.amount(1);
 		od4.send(speedCorrection);
@@ -249,7 +249,7 @@ int32_t main(int32_t argc, char **argv) {
 		od4.send(steeringCorrection);
 
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-		
+
 		StopCarRequest stopCar;
 		od4.send(stopCar);
 
@@ -259,7 +259,7 @@ int32_t main(int32_t argc, char **argv) {
 		speedCorrection2.amount(-1);
 		od4.send(speedCorrection2);
 
-		
+
 		StopSignPresenceUpdate stopSign;
 		stopSign.stopSignPresence(true);
 		od4.send(stopSign);*/
@@ -267,6 +267,7 @@ int32_t main(int32_t argc, char **argv) {
 	/*if (!stopCarSent){
 	MoveForward (od4, 0.13, VERBOSE);
 	}*/
+		}
 		return 0;
 	}
 }
