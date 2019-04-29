@@ -415,8 +415,17 @@ message SpeedCorrectionRequest [id=2006] {
 message StopCarRequest [id=2007] {
 }
 
+
+
 message TurnLeftRequest [id=2008] {
 }
 
 message TurnRightRequest [id=2009] {
 }
+
+
+message StopSignPresenceUpdate[id = 2010]{
+   bool stopSignPresence [id = 1];
+}
+
+
