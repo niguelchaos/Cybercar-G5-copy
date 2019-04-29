@@ -106,7 +106,7 @@ int32_t main(int32_t argc, char **argv) {
         auto onFrontDistanceReading{[&od4, SAFETYDISTANCE, VERBOSE, &currentDistance](cluon::data::Envelope &&envelope)
             // &<variables> will be captured by reference (instead of value only)
             {
-		if (!stopCarSent) {
+		//if (!stopCarSent) {
 		        auto msg = cluon::extractMessage<opendlv::proxy::DistanceReading>(std::move(envelope));
 		        const uint16_t senderStamp = envelope.senderStamp(); // senderStamp 0 corresponds to front ultra-sound distance sensor
 		        currentDistance = msg.distance(); // Get the distance
@@ -124,7 +124,7 @@ int32_t main(int32_t argc, char **argv) {
 					currentCarSpeed = 0.0;
 				}
 			}
-		}
+		//}
             }
         };
         od4.dataTrigger(opendlv::proxy::DistanceReading::ID(), onFrontDistanceReading);
@@ -234,9 +234,12 @@ int32_t main(int32_t argc, char **argv) {
 
 	//Bool messages for sotping the car
 
+
+	
+
 	auto onStopCar{[&od4, VERBOSE](cluon::data::Envelope &&envelope)
             {
-		if (!stopCarSent) {
+		//if (!stopCarSent) {
 		auto msg = cluon::extractMessage<StopSignPresenceUpdate>(std::move(envelope));
 		bool stopSignPresence = msg.stopSignPresence(); // Get the bool
 
@@ -258,7 +261,7 @@ int32_t main(int32_t argc, char **argv) {
 			MoveForward (od4, 0.13, VERBOSE);
 			
 			}
-		}
+		//}
 	    }
         };
         od4.dataTrigger(StopSignPresenceUpdate::ID(), onStopCar);
@@ -354,7 +357,6 @@ std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 	MoveForward (od4, 0.13, VERBOSE);
 	
 	}*/
-
 
 	}
         return 0;
