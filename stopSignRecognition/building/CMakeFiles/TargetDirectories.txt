@@ -1,7 +1,0 @@
-/home/nora/gitrepos/group_05/stopSignRecognition/building/CMakeFiles/install/strip.dir
-/home/nora/gitrepos/group_05/stopSignRecognition/building/CMakeFiles/edit_cache.dir
-/home/nora/gitrepos/group_05/stopSignRecognition/building/CMakeFiles/stop-sign.dir
-/home/nora/gitrepos/group_05/stopSignRecognition/building/CMakeFiles/list_install_components.dir
-/home/nora/gitrepos/group_05/stopSignRecognition/building/CMakeFiles/install/local.dir
-/home/nora/gitrepos/group_05/stopSignRecognition/building/CMakeFiles/rebuild_cache.dir
-/home/nora/gitrepos/group_05/stopSignRecognition/building/CMakeFiles/install.dir
