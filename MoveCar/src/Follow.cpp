@@ -97,8 +97,8 @@ int32_t main(int32_t argc, char **argv) {
 		}
 
 	   const bool VERBOSE{commandlineArguments.count("verbose") != 0};
-		const float STARTSPEED{(commandlineArguments["startspeed"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["startspeed"])) : static_cast<float>(0.11)};
-		const float MAXSPEED{(commandlineArguments["maxspeed"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["maxspeed"])) : static_cast<float>(0.25)};
+		const float STARTSPEED{(commandlineArguments["startspeed"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["startspeed"])) : static_cast<float>(0.10)};
+		const float MAXSPEED{(commandlineArguments["maxspeed"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["maxspeed"])) : static_cast<float>(0.16)};
 
 		const float MAXSTEER{(commandlineArguments["maxsteer"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["maxsteer"])) : static_cast<float>(0.4)};
 		const float MINSTEER{(commandlineArguments["minsteer"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["minsteer"])) : static_cast<float>(-0.4)};
@@ -165,9 +165,9 @@ int32_t main(int32_t argc, char **argv) {
 
 
 			/*if (stopSignPresence==false){
-			
+
 			MoveForward (od4, 0.13, VERBOSE);
-			
+
 			}*/
 		}
 	    }
