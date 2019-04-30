@@ -284,26 +284,33 @@ void checkCarDistance(double *prev_area, double area, double centerY, OD4Session
 // https://robotics.stackexchange.com/questions/9786/how-do-the-pid-parameters-kp-ki-and-kd-affect-the-heading-of-a-differential
    SpeedCorrectionRequest speed_correction;
 
-   float optimal_area = 8000; // default optimal area
+   float optimal_area = 7000; // default optimal area
    float area_diff = (float)area - (float) *prev_area; // looks at how much car has accelerated/deccelerated
 
-   if (area_diff > 100) {
+   if (area_diff < 50) {
+      optimal_area = optimal_area + (area_diff * 0.7f);
+      cout << "         // Area diff: " << area_diff << "//    ";
+      cout << "New Optimal Area: " << optimal_area << "//" << endl;
+   }
+   if (area_diff > 50) {
       // make optimal area farther(smaller) if the car has accelerated a lot to brake earlier and harder.
       // small differences dont make much of a difference - deals with large variations of area
-      optimal_area = optimal_area - area_diff;
-      cout << "// Area diff: " << area_diff << "//    ";
+      optimal_area = optimal_area - (area_diff * 1.5f);
+      cout << "         // Area diff: " << area_diff << "//    ";
       cout << "New Optimal Area: " << optimal_area << "//" << endl;
    }
 
 // the Integral and Derivative was not used due to time constraints.
    float error = optimal_area - (float) area;
+
    float kp = 1; // proportional gain constant, tunes controller. In our case, we have it as 1 to make it balanced.
    float output = kp * error;
    float correction_speed;
    // braking needs to be stronger than accelerating, need to modify correction to suit it.
-   if (output > 0) { correction_speed = output / 900000; }
+   if (output > 0) { correction_speed = output / 1000000; }
    if (output <= 0) { correction_speed = output / 100000; }
-
+   // center y closest = 180 // safedist y = 205 // farthest ~ 230
+// max area = 51000          // safedist area = 11000
 // braking needs to be faster than accelerating. I dont care.
    if (correction_speed <= 0) { correction_speed = correction_speed * 5; } // hard multiplier by 5
 
