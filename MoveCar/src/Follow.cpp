@@ -102,9 +102,7 @@ int32_t main(int32_t argc, char **argv) {
 
 		const float MAXSTEER{(commandlineArguments["maxsteer"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["maxsteer"])) : static_cast<float>(0.4)};
 		const float MINSTEER{(commandlineArguments["minsteer"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["minsteer"])) : static_cast<float>(-0.4)};
-		const float SAFETYDISTANCE{(commandlineArguments["safetyDistance"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["safetyDistance"])) : static_cast<float>(0.15)};
-	// const float SPEEDINCREMENT{(commandlineArguments["speedIncrement"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["speedIncrement"])) : static_cast<float>(0.01)};
-	// const float STEERINCREMENT{(commandlineArguments["steerIncrement"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["steerIncrement"])) : static_cast<float>(0.01)};
+		const float SAFETYDISTANCE{(commandlineArguments["safetyDistance"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["safetyDistance"])) : static_cast<float>(0.01)};
 
       // A Data-triggered function to detect front obstacle and stop or move car accordingly
       float currentDistance{0.0};
@@ -145,10 +143,11 @@ int32_t main(int32_t argc, char **argv) {
 // 	};
 //   od4.dataTrigger(StopCarRequest::ID(), onStopCar);
 
-   	//Bool messages for stopping the car
-	auto onStopCar{[&od4, VERBOSE](cluon::data::Envelope &&envelope)
-    {
-		//if (!stopCarSent) {
+
+	//Bool message for stoping the car
+   auto onStopCar{[&od4, VERBOSE](cluon::data::Envelope &&envelope)
+            {
+		if (!stopCarSent) {
 		auto msg = cluon::extractMessage<StopSignPresenceUpdate>(std::move(envelope));
 		bool stopSignPresence = msg.stopSignPresence(); // Get the bool
 
@@ -159,14 +158,18 @@ int32_t main(int32_t argc, char **argv) {
 
 			if (stopSignPresence==true){
 
+
 			stopCarSent = true;
 			StopCar(od4, VERBOSE);
 			}
 
-			if (stopSignPresence==false){
+
+			/*if (stopSignPresence==false){
+			
 			MoveForward (od4, 0.13, VERBOSE);
-			}
-		//}
+			
+			}*/
+		}
 	    }
         };
         od4.dataTrigger(StopSignPresenceUpdate::ID(), onStopCar);
