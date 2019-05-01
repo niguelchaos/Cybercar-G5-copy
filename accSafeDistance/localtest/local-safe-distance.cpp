@@ -269,16 +269,93 @@ Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int followca
    return image;
 }
 
+// https://answers.opencv.org/question/75510/how-to-make-auto-adjustmentsbrightness-and-contrast-for-image-android-opencv-image-correction/
+void BrightnessAndContrastAuto(const cv::Mat &src, cv::Mat &dst, float clipHistPercent = 0)
+{
+
+    CV_Assert(clipHistPercent >= 0);
+    CV_Assert((src.type() == CV_8UC1) || (src.type() == CV_8UC3) || (src.type() == CV_8UC4));
+
+    int histSize = 256;
+    float alpha, beta;
+    double minGray = 0, maxGray = 0;
+
+    //to calculate grayscale histogram
+    cv::Mat gray;
+    if (src.type() == CV_8UC1) gray = src;
+    else if (src.type() == CV_8UC3) cvtColor(src, gray, COLOR_BGR2GRAY);
+    else if (src.type() == CV_8UC4) cvtColor(src, gray, COLOR_BGRA2GRAY);
+    if (clipHistPercent == 0)
+    {
+        // keep full available range
+        // Finds the global minimum and maximum in an array.
+        cv::minMaxLoc(gray, &minGray, &maxGray);
+    }
+    else
+    {
+        cv::Mat hist; //the grayscale histogram
+
+        float range[] = { 0, 256 };
+        const float* histRange = { range };
+        bool uniform = true;
+        bool accumulate = false;
+        calcHist(&gray, 1, 0, cv::Mat (), hist, 1, &histSize, &histRange, uniform, accumulate);
+
+        // calculate cumulative distribution from the histogram
+        std::vector<float> accumulator(histSize);
+        accumulator[0] = hist.at<float>(0);
+        for (int i = 1; i < histSize; i++)
+        {
+            accumulator[i] = accumulator[i - 1] + hist.at<float>(i);
+        }
+
+        // locate points that cuts at required value
+        float max = accumulator.back();
+        clipHistPercent *= (max / 100.0); //make percent as absolute
+        clipHistPercent /= 2.0; // left and right wings
+        // locate left cut
+        minGray = 0;
+        while (accumulator[minGray] < clipHistPercent)
+            minGray++;
+
+        // locate right cut
+        maxGray = histSize - 1;
+        while (accumulator[maxGray] >= (max - clipHistPercent))
+            maxGray--;
+    }
+
+    // current range
+    float inputRange = maxGray - minGray;
+
+    alpha = (histSize - 1) / inputRange;   // alpha expands current range to histsize range
+    beta = -minGray * alpha;             // beta shifts current range so that minGray will go to 0
+
+    // Apply brightness and contrast normalization
+    // convertTo operates with saturate_cast
+    src.convertTo(dst, -1, alpha, beta);
+
+    // restore alpha channel from source
+    if (dst.type() == CV_8UC4)
+    {
+        int from_to[] = { 3, 3};
+        cv::mixChannels(&src, 4, &dst,1, from_to, 1);
+    }
+    return;
+}
 
 int main(int argc, char** argv) {
 
    Mat frame;
+   Mat brightened_frame;
    Mat frame_HSV;
    Mat frame_gray;
    Mat frame_threshold_pink;
    Mat frame_threshold_yellow;
    Mat finalFramePink;
+   Mat finalSatFramePink;
    Mat finalFrameYellow;
+   Mat saturatedFrame;
+   Mat saturated_frame_threshold_pink;
    vector<vector<Point> > pinkSquares;
    vector<vector<Point> > yellowSquares;
 
@@ -286,9 +363,9 @@ int main(int argc, char** argv) {
    const int max_value = 255;
 
 // Pink
-   int low_H_pink = 140;
+   int low_H_pink = 135;
    int low_S_pink = 50;
-   int low_V_pink = 30;
+   int low_V_pink = 65;
    int high_H_pink = max_value_H;
    int high_S_pink = max_value;
    int high_V_pink = max_value;
@@ -327,15 +404,15 @@ int main(int argc, char** argv) {
    // get frame from the video
      cap >> frame;
    //   roi=selectROI("tracker",frame);
-   //
+
      if(frame.empty()) {
          break;
          help(argv[0]);
      }
 
-     HelloWorld helloworld;
-     helloworld.helloworld("Hello world aaaaaaaaaa");
-     od4.send(helloworld);
+     // HelloWorld helloworld;
+     // helloworld.helloworld("Hello world aaaaaaaaaa");
+     // od4.send(helloworld);
 
      SpeedUp speedup;
      SpeedDown speeddown;
@@ -344,21 +421,31 @@ int main(int argc, char** argv) {
      carResult[0] = 0;
      carResult[1] = 0; //clear
 
+     BrightnessAndContrastAuto(frame, brightened_frame,0.5);
       // Convert from BGR to HSV colorspace
       cvtColor(frame, frame_HSV, COLOR_BGR2HSV);
+      cvtColor(brightened_frame, saturatedFrame, COLOR_BGR2HSV);
+      // what it does here is dst = (uchar) ((double)src*scale+saturation);
+      // frame.convertTo(saturatedFrame, CV_8UC1, scale, saturation);
+
       // Detect the object based on HSV Range Values
       inRange(frame_HSV, Scalar(low_H_pink, low_S_pink, low_V_pink), Scalar(high_H_pink, high_S_pink, high_V_pink), frame_threshold_pink);
-      inRange(frame_HSV, Scalar(low_H_yellow, low_S_yellow, low_V_yellow), Scalar(high_H_yellow, high_S_yellow, high_V_yellow), frame_threshold_yellow);
+      // inRange(frame_HSV, Scalar(low_H_yellow, low_S_yellow, low_V_yellow), Scalar(high_H_yellow, high_S_yellow, high_V_yellow), frame_threshold_yellow);
 
+      inRange(saturatedFrame, Scalar(low_H_pink, low_S_pink, low_V_pink), Scalar(high_H_pink, high_S_pink, high_V_pink), saturated_frame_threshold_pink);
+      // inRange(saturatedFrame, Scalar(low_H_yellow, low_S_yellow, low_V_yellow), Scalar(high_H_yellow, high_S_yellow, high_V_yellow), frame_threshold_yellow);
       // convert it into grayscale and blur it to get rid of the noise.
-      // cvtColor( frame, frame_gray, COLOR_BGR2GRAY );
+
       // blur( frame_gray, frame_gray, Size(3,3) );
 
       findSquares(frame_threshold_pink, pinkSquares);
       finalFramePink = drawSquares(frame_threshold_pink, pinkSquares, 0, carResult);
 
-      findSquares(frame_threshold_yellow, yellowSquares);
-      finalFrameYellow = drawSquares(frame_threshold_yellow, yellowSquares, 1, carResult);
+      findSquares(saturated_frame_threshold_pink, pinkSquares);
+      finalSatFramePink = drawSquares(saturated_frame_threshold_pink, pinkSquares, 0, carResult);
+
+      // findSquares(frame_threshold_yellow, yellowSquares);
+      // finalFrameYellow = drawSquares(frame_threshold_yellow, yellowSquares, 1, carResult);
 
       if (carResult[0] < 0) { // slow down if speed is lower than 0
          speeddown.speed(carResult[0]);
@@ -371,8 +458,11 @@ int main(int argc, char** argv) {
 
 
       // show image with the tracked object
-      imshow("Pink", finalFramePink);
-      imshow("Yellow", finalFrameYellow);
+      imshow("PinkOrig", finalFramePink);
+      imshow("Original", frame);
+      // imshow("Yellow", finalFrameYellow);
+      imshow ("Sat Pink", finalSatFramePink);
+      imshow("brightened boiiii", brightened_frame);
 
       // // show image with the tracked object
       // imshow("tracker",frame);

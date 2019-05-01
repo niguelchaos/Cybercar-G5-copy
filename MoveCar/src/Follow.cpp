@@ -98,7 +98,7 @@ int32_t main(int32_t argc, char **argv) {
 
 	   const bool VERBOSE{commandlineArguments.count("verbose") != 0};
 		const float STARTSPEED{(commandlineArguments["startspeed"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["startspeed"])) : static_cast<float>(0.10)};
-		const float MAXSPEED{(commandlineArguments["maxspeed"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["maxspeed"])) : static_cast<float>(0.16)};
+		const float MAXSPEED{(commandlineArguments["maxspeed"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["maxspeed"])) : static_cast<float>(0.13)};
 
 		const float MAXSTEER{(commandlineArguments["maxsteer"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["maxsteer"])) : static_cast<float>(0.4)};
 		const float MINSTEER{(commandlineArguments["minsteer"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["minsteer"])) : static_cast<float>(-0.4)};
@@ -186,6 +186,13 @@ int32_t main(int32_t argc, char **argv) {
 			{
 		    		std::cout << "Received Speed Correction message: " << amount << std::endl;
 			}
+			if (amount == 1337) {
+				if (currentCarSpeed >= STARTSPEED) {
+					currentCarSpeed += -0.002; // car will eventually come to a stop
+					cout << "Visual Lost, reducing speed" << endl;
+				}
+			}
+
 			if ( currentCarSpeed < STARTSPEED && amount > 0) 	{ currentCarSpeed = STARTSPEED;	}// Set car speed to minimal moving car speed
 			if ( currentCarSpeed < STARTSPEED && amount < 0) 	{ currentCarSpeed = 0.0;	} // automatically makes it 0, preventing car from moving backwards
 			else {
@@ -210,6 +217,15 @@ int32_t main(int32_t argc, char **argv) {
 				std::cout << "Absolute Steering Correction: " << amount << std::endl;
 			}
 
+			if (amount == 1337) { // slowly straighten back out the wheels if visual lost
+				if (currentSteering < 0) {
+					currentSteering += 0.05;
+				}
+				if (currentSteering > 0) {
+					currentSteering += -0.05;
+				}
+			}
+
 			// check if...
 			if (amount >= -0.05 && amount < 0.05 && // and acc car is relatively in front...
 			    (currentSteering <= -0.05 || currentSteering > 0.05) && // and wheels are not straight...
@@ -220,7 +236,13 @@ int32_t main(int32_t argc, char **argv) {
 			}
 			else {
 				currentSteering = amount;
-				if (currentSteering > MAXSTEER) { currentSteering = MAXSTEER; }
+				if (currentSteering > MAXSTEER) {
+					currentSteering = MAXSTEER;
+
+					if (currentCarSpeed > STARTSPEED) { // slow down the car to give the car time to make it less blurry
+						currentCarSpeed = currentCarSpeed - 0.003;
+					}
+				}
 				if (currentSteering < MINSTEER) { currentSteering = MINSTEER; }
 			}
 			SetSteering(od4, currentSteering, VERBOSE);
