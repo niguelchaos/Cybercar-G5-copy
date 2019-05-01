@@ -33,4 +33,4 @@ docker run --rm -ti --init --net=host --ipc=host -v /tmp:/tmp cardetect/<whateve
 
 2. in the build folder, type ```cmake ..```
 3. then, ```make```
-4. then, ```./local-safe-distance```
+4. then, ```./local-car-detection```
