@@ -290,28 +290,28 @@ void checkCarIsMovingAndPosition(
    int offset = 110;
 
 
-   cout << "[center X: " << centerX << " ]";
+   cout << " [ center X: " << centerX << " ]   // ";
    if (centerX < frame_center - offset) {
-      cout << "Car on the left" << endl;
+      cout << "   << Car on left " << endl;
    }
    if (centerX >= frame_center - offset && centerX < frame_center + offset) {
-      cout << "Car in the middle" << endl;
+      cout << "   || Car in middle ||" << endl;
    }
    if (centerX > frame_center + offset) {
-      cout << "Car on the right" << endl;
+      cout << "   Car on right >>" << endl;
    }
 
    cout << " // Area diff: " << area_diff << "// ";
    cout << " [[ area: " << area << " ]]";
    cout << "  // [[center Y: " << centerY << " ]] // " << endl;
    if (area_diff < -100) { // If the car is moving away
-      cout << "Car is moving away" << endl;
+      cout << "Car moving away   " ;
    }
    if (area_diff >= -100 && area_diff < 100) {
-      cout << "car is somewhat stationary" << endl;
+      cout << "car stationary ";
    }
    if (area_diff >= 100) {
-      cout << " car is coming closer" << endl;
+      cout << " car coming closer   " ;
    }
 }
 
@@ -369,9 +369,9 @@ void countCars(Mat frame, vector<Rect>& rects) {
       cout << "No cars. \n";
    }
    else if (rect_num == 1) {
-      cout << "            [  " << car_count << " car. ]" << endl;
+      cout << " //           [  " << car_count << " car. ]" << endl;
    } else {
-      cout << "            [  " << car_count << " cars. ]" << endl;
+      cout << " //           [  " << car_count << " cars. ]" << endl;
    }
    putText(frame, car_count, Point(5,100), FONT_HERSHEY_DUPLEX, 1, Scalar(255,255,255), 2);
 }
