@@ -174,11 +174,11 @@ int32_t main(int32_t argc, char **argv) {
 
              // Display image. For testing recordings only.
             if (VERBOSE) {
-               imshow("Pink", finalFramePink);
-               // imshow("Green", finalFrameGreen);
-               imshow("original frame", cropped_frame);
-               imshow("brightened bois", brightened_frame);
-               cv::waitKey(1);
+               // imshow("Pink", finalFramePink);
+               // // imshow("Green", finalFrameGreen);
+               // imshow("original frame", cropped_frame);
+               // imshow("brightened bois", brightened_frame);
+               // cv::waitKey(1);
             }
 
             // measures FPS
