@@ -179,7 +179,7 @@ int32_t main(int32_t argc, char **argv) {
             // measures FPS
             framecounter++;
             if (timestampsecs != prevtimestampsecs) {
-               cout << endl << "Timestamp: " << timestampsecs << "          FPS: " << framecounter << endl;
+               cout << endl << "Timestamp: " << timestampsecs << "          FPS: " << framecounter ;
                prevtimestampsecs = timestampsecs;
                framecounter = 0;
             }
@@ -291,6 +291,7 @@ void checkCarIsMovingAndPosition(
 
 
    cout << " [ center X: " << centerX << " ]   // ";
+   cout << "  // [[center Y: " << centerY << " ]] // " ;
    if (centerX < frame_center - offset) {
       cout << "   << Car on left " << endl;
    }
@@ -301,17 +302,16 @@ void checkCarIsMovingAndPosition(
       cout << "   Car on right >>" << endl;
    }
 
-   cout << " // Area diff: " << area_diff << "// ";
    cout << " [[ area: " << area << " ]]";
-   cout << "  // [[center Y: " << centerY << " ]] // " << endl;
+   cout << " // Area diff: " << area_diff << " // ";
    if (area_diff < -100) { // If the car is moving away
-      cout << "Car moving away   " ;
+      cout << "Car moving away   " << endl;
    }
    if (area_diff >= -100 && area_diff < 100) {
-      cout << "car stationary ";
+      cout << "car stationary " << endl;
    }
    if (area_diff >= 100) {
-      cout << " car coming closer   " ;
+      cout << " car coming closer   " << endl ;
    }
 }
 
@@ -366,12 +366,12 @@ void countCars(Mat frame, vector<Rect>& rects) {
    int rect_num =  rects.size();
    std::string car_count = std::to_string(rect_num);
    if (rect_num == 0) {
-      cout << "No cars. \n";
+      // cout << "No cars. ";
    }
    else if (rect_num == 1) {
-      cout << " //           [  " << car_count << " car. ]" << endl;
+      cout << "           [<  " << car_count << " car. >]  " << endl;
    } else {
-      cout << " //           [  " << car_count << " cars. ]" << endl;
+      cout << "           [<  " << car_count << " cars. >] " << endl;
    }
    putText(frame, car_count, Point(5,100), FONT_HERSHEY_DUPLEX, 1, Scalar(255,255,255), 2);
 }
