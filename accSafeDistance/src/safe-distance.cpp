@@ -61,6 +61,7 @@ static double angle( Point pt1, Point pt2, Point pt0 );
 void countCars(Mat frame, vector<Rect>& rects);
 void checkCarPosition(double centerX, OD4Session *od4) ;
 void checkCarDistance(double *prev_area, double area, double centerY, OD4Session *od4);
+void BrightnessAndContrastAuto(const cv::Mat &src, cv::Mat &dst, float clipHistPercent = 0);
 
 int32_t main(int32_t argc, char **argv) {
    int32_t retCode{1};
@@ -106,6 +107,7 @@ int32_t main(int32_t argc, char **argv) {
             Mat frame_HSV;
             Mat frame_gray;
             Mat cropped_frame;
+            Mat brightened_frame;
             Mat frame_threshold_pink;
             Mat frame_threshold_green;
             Mat finalFramePink;
@@ -155,8 +157,11 @@ int32_t main(int32_t argc, char **argv) {
 
             // Crop the frame to get useful stuff
             frame(Rect(Point(0, 0), Point(640, 370))).copyTo(cropped_frame);
+
+            // Automatically increase the brightness and contrast of the video.
+            BrightnessAndContrastAuto(cropped_frame, brightened_frame);
             // Convert from BGR to HSV colorspace
-            cvtColor(cropped_frame, frame_HSV, COLOR_RGB2HSV);
+            cvtColor(brightened_frame, frame_HSV, COLOR_RGB2HSV);
             // Detect the object based on HSV Range Values
             inRange(frame_HSV, Scalar(low_H_pink, low_S_pink, low_V_pink), Scalar(high_H_pink, high_S_pink, high_V_pink), frame_threshold_pink);
             // inRange(frame_HSV, Scalar(low_H_green, low_S_green, low_V_green), Scalar(high_H_green, high_S_green, high_V_green), frame_threshold_green);
@@ -169,15 +174,17 @@ int32_t main(int32_t argc, char **argv) {
 
              // Display image. For testing recordings only.
             if (VERBOSE) {
-            //    imshow("Pink", finalFramePink);
-            //    imshow("Green", finalFrameGreen);
-            //    cv::waitKey(1);
+               imshow("Pink", finalFramePink);
+               // imshow("Green", finalFrameGreen);
+               imshow("original frame", cropped_frame);
+               imshow("brightened bois", brightened_frame);
+               cv::waitKey(1);
             }
 
             // measures FPS
             framecounter++;
             if (timestampsecs != prevtimestampsecs) {
-               cout << "Timestamp: " << timestampsecs << "          FPS: " << framecounter << endl;
+               cout << endl << "Timestamp: " << timestampsecs << "          FPS: " << framecounter << endl;
                prevtimestampsecs = timestampsecs;
                framecounter = 0;
             }
@@ -283,59 +290,73 @@ void checkCarDistance(double *prev_area, double area, double centerY, OD4Session
 // PID controller
 // https://robotics.stackexchange.com/questions/9786/how-do-the-pid-parameters-kp-ki-and-kd-affect-the-heading-of-a-differential
    SpeedCorrectionRequest speed_correction;
-
-   float optimal_area = 7000; // default optimal area
-   float area_diff = (float)area - (float) *prev_area; // looks at how much car has accelerated/deccelerated
-
-   if (area_diff < 50) {
-      optimal_area = optimal_area + (area_diff * 0.7f);
-      cout << "         // Area diff: " << area_diff << "//    ";
-      cout << "New Optimal Area: " << optimal_area << "//" << endl;
-   }
-   if (area_diff > 50) {
-      // make optimal area farther(smaller) if the car has accelerated a lot to brake earlier and harder.
-      // small differences dont make much of a difference - deals with large variations of area
-      optimal_area = optimal_area - (area_diff * 1.5f);
-      cout << "         // Area diff: " << area_diff << "//    ";
-      cout << "New Optimal Area: " << optimal_area << "//" << endl;
-   }
-
-// the Integral and Derivative was not used due to time constraints.
-   float error = optimal_area - (float) area;
-
-   float kp = 1; // proportional gain constant, tunes controller. In our case, we have it as 1 to make it balanced.
-   float output = kp * error;
    float correction_speed;
-   // braking needs to be stronger than accelerating, need to modify correction to suit it.
-   if (output > 0) { correction_speed = output / 1000000; }
-   if (output <= 0) { correction_speed = output / 100000; }
-   // center y closest = 180 // safedist y = 205 // farthest ~ 230
-// max area = 51000          // safedist area = 11000
-// braking needs to be faster than accelerating. I dont care.
-   if (correction_speed <= 0) { correction_speed = correction_speed * 5; } // hard multiplier by 5
+   if (area < 1 || centerY > 1336.9) {
+      correction_speed = 1337; // special code for visual lost
+   }
+   else {
+      float optimal_area = 7000; // default optimal area
+      float area_diff = (float)area - (float) *prev_area; // looks at how much car has accelerated/deccelerated
 
-   cout << " [[ area: " << area << " ]]";
-   cout << "  // [[center Y: " << centerY << " ]] // ";
-   cout << " // [ speed correction : " << correction_speed << " ] // " << endl;
+      if (area_diff < -500) { // If the car is moving away
+         optimal_area = optimal_area + (area_diff * 0.7f); // dampen (softly) accelerate
+      }
+
+      if (area_diff >= 800) {
+         // make optimal area farther(smaller) if the car has accelerated a lot to brake earlier and harder.
+         // small differences dont make much of a difference - deals with large variations of area
+         optimal_area = optimal_area - (area_diff * 1.5f);
+      }
+      cout << "         // Area diff: " << area_diff << "//    ";
+      cout << "New Opt Area: " << optimal_area << "//" << endl;
+
+   // the Integral and Derivative was not used due to time constraints.
+      float error = optimal_area - (float) area;
+      float kp = 1; // proportional gain constant, tunes controller. In our case, we have it as 1 to make it balanced.
+      float output = kp * error;
+
+      // braking needs to be stronger than accelerating, need to modify correction to suit it.
+      if (output > 0) { correction_speed = output / 1000000; }
+      if (output <= 0) { correction_speed = output / 100000; }
+
+   // braking needs to be faster than accelerating. I dont care.
+      if (correction_speed <= 0) { correction_speed = correction_speed * 5; } // hard multiplier by 5
+
+   // If the car in front has somewhat been maintaining the distance
+      if (area_diff >= -500 && area_diff < 800) {
+         correction_speed = -0.001f; // Artificial "Letting go of the pedal"
+      }
+
+      cout << " [[ area: " << area << " ]]";
+      cout << "  // [[center Y: " << centerY << " ]] // ";
+      cout << "  << speed correction : " << correction_speed << " >> // " << endl;
+   }
 
    speed_correction.amount(correction_speed);
    od4->send(speed_correction);
 }
 
 void checkCarPosition(double centerX, OD4Session *od4) {
+
    int frame_center = 320; // Setpoint - we want the car to ideally be in center.
 // PID controller test
 // https://robotics.stackexchange.com/questions/9786/how-do-the-pid-parameters-kp-ki-and-kd-affect-the-heading-of-a-differential
    SteeringCorrectionRequest steering_correction;
-   float error = frame_center - (float) centerX;
+   float correction_angle;
+   if (centerX > 1336.9) { // notify movecar
+      correction_angle = 1337; // Special code for visual lost
+   }
+   else {
+      float error = frame_center - (float) centerX;
 
-//////////////////////// Absolute pid steering correction ////////////////////
-   float kp = 1;
-   float output = kp * error; // Ki * integral + Kd * derivative
-   float correction_angle = output / 800; // because groundsteering max = 0.4 here
+   //////////////////////// Absolute pid steering correction ////////////////////
+      float kp = 1;
+      float output = kp * error; // Ki * integral + Kd * derivative
+      correction_angle = output / 800; // because groundsteering max = 0.4 here
 
-   cout << "[[center X: " << centerX << " ]]";
-   cout << " // [ steering correction: " << correction_angle << " ]  // " << endl;
+      cout << "[center X: " << centerX << " ]";
+      cout << " // [[ steering correction: " << correction_angle << " ]]  // " << endl;
+   }
 
    /////////////////////////// PID Controller test ////////////////////////////
    steering_correction.amount(correction_angle);
@@ -360,16 +381,28 @@ static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int f
 
    groupRectangles(boundRects, group_thresh, merge_box_diff);  //group overlapping rectangles into 1
 
+   double rect_area = 0;
+   double rect_centerX = 1337; // valid range from 0 - 640
+   double rect_centerY = 1337; // valid range from 0 - 480
+
+   // if there are no bounding Rects....
+   if (boundRects.size() < 1) {
+      // ...notify Movecar component that car is nowhere to be seen / lost visual
+      checkCarDistance( prev_area, rect_area, rect_centerY, od4);
+      checkCarPosition( rect_centerX, od4);
+      cout << " | Lost Visual | ";
+   }
+
    // only check distance and steering corrections, along with number of cars, after merging.
    for (size_t i = 0; i < boundRects.size(); i++) {
       int rect_x = boundRects[i].x;
       int rect_y = boundRects[i].y;
       int rect_width = boundRects[i].width;
       int rect_height = boundRects[i].height;
-      double rect_area = boundRects[i].area();
+      rect_area = boundRects[i].area();
 
-      double rect_centerX = rect_x + 0.5 * rect_width;
-      double rect_centerY = rect_y + 0.5 * rect_height;
+      rect_centerX = rect_x + 0.5 * rect_width;
+      rect_centerY = rect_y + 0.5 * rect_height;
 
       // Now with those parameters you can calculate the 4 points
       Point top_left(rect_x,rect_y);
@@ -403,4 +436,83 @@ void countCars(Mat frame, vector<Rect>& rects) {
       cout << "            [  " << car_count << " cars. ]  \n \n";
    }
    putText(frame, car_count, Point(5,100), FONT_HERSHEY_DUPLEX, 1, Scalar(255,255,255), 2);
+}
+
+// https://answers.opencv.org/question/75510/how-to-make-auto-adjustmentsbrightness-and-contrast-for-image-android-opencv-image-correction/
+void BrightnessAndContrastAuto(const cv::Mat &src, cv::Mat &dst, float clipHistPercent)
+{
+   // Tries to stretch/average out the range on a greyscale image. Might need tuning.
+   // works only on gray images and ARGB color space.
+
+    CV_Assert(clipHistPercent >= 0);
+    CV_Assert((src.type() == CV_8UC1) || (src.type() == CV_8UC3) || (src.type() == CV_8UC4));
+
+   // alpha (contrast) operates as color range amplifier, values from 0 - 3
+   // beta (brightness) operates as range shift, values from 0 - 100
+    int histSize = 256;
+    float alpha, beta;
+    double minGray = 0, maxGray = 0;
+
+    //to calculate grayscale histogram
+    cv::Mat gray;
+    if (src.type() == CV_8UC1) gray = src;
+    else if (src.type() == CV_8UC3) cvtColor(src, gray, COLOR_BGR2GRAY);
+    else if (src.type() == CV_8UC4) cvtColor(src, gray, COLOR_BGRA2GRAY);
+    if (clipHistPercent <= 0)
+    {
+        // keep full available range
+        // Finds the global minimum and maximum in an array.
+        cv::minMaxLoc(gray, &minGray, &maxGray);
+    }
+    else
+    {
+        cv::Mat hist; //the grayscale histogram
+
+        float range[] = { 0, 256 };
+        const float* histRange = { range };
+        bool uniform = true;
+        bool accumulate = false;
+        calcHist(&gray, 1, 0, cv::Mat (), hist, 1, &histSize, &histRange, uniform, accumulate);
+
+        // calculate cumulative distribution from the histogram
+        std::vector<float> accumulator(histSize);
+        accumulator[0] = hist.at<float>(0);
+        for (int i = 1; i < histSize; i++)
+        {
+            accumulator[i] = accumulator[i - 1] + hist.at<float>(i);
+        }
+
+        // locate points that cuts at required value
+        float max = accumulator.back();
+        clipHistPercent *= (max / 100.0f); //make percent as absolute
+        clipHistPercent /= 2.0f; // left and right wings
+        // locate left cut
+        minGray = 0;
+        while (accumulator[(long)minGray] < clipHistPercent)
+            minGray++;
+
+        // locate right cut
+        maxGray = histSize - 1;
+        while (accumulator[(long)maxGray] >= (max - clipHistPercent))
+            maxGray--;
+    }
+
+    // current range
+    float inputRange = (float)maxGray - (float)minGray;
+
+    alpha = (histSize - 1) / inputRange;   // alpha expands current range to histsize range
+    beta = (float)-minGray * (float)alpha;             // beta shifts current range so that minGray will go to 0
+
+    // does the actual brightening.
+    // Apply brightness and contrast normalization
+    // convertTo operates with saturate_cast
+    src.convertTo(dst, -1, alpha, beta);
+
+    // restore alpha channel from source / merges the frame back together from gray
+    if (dst.type() == CV_8UC4)
+    {
+        int from_to[] = { 3, 3};
+        cv::mixChannels(&src, 4, &dst,1, from_to, 1);
+    }
+    return;
 }
