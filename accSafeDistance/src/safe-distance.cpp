@@ -158,10 +158,12 @@ int32_t main(int32_t argc, char **argv) {
             // Crop the frame to get useful stuff
             frame(Rect(Point(0, 0), Point(640, 370))).copyTo(cropped_frame);
 
+            // auto brighten src needs to either be in gray or BGR
+            cvtColor(cropped_frame, brightened_frame, COLOR_RGB2BGR);
             // Automatically increase the brightness and contrast of the video.
-            BrightnessAndContrastAuto(cropped_frame, brightened_frame);
+            BrightnessAndContrastAuto(brightened_frame, brightened_frame);
             // Convert from BGR to HSV colorspace
-            cvtColor(brightened_frame, frame_HSV, COLOR_RGB2HSV);
+            cvtColor(brightened_frame, frame_HSV, COLOR_BGR2HSV);
             // Detect the object based on HSV Range Values
             inRange(frame_HSV, Scalar(low_H_pink, low_S_pink, low_V_pink), Scalar(high_H_pink, high_S_pink, high_V_pink), frame_threshold_pink);
             // inRange(frame_HSV, Scalar(low_H_green, low_S_green, low_V_green), Scalar(high_H_green, high_S_green, high_V_green), frame_threshold_green);
@@ -291,23 +293,27 @@ void checkCarDistance(double *prev_area, double area, double centerY, OD4Session
 // https://robotics.stackexchange.com/questions/9786/how-do-the-pid-parameters-kp-ki-and-kd-affect-the-heading-of-a-differential
    SpeedCorrectionRequest speed_correction;
    float correction_speed;
-   if (area < 1 || centerY > 1336.9) {
-      correction_speed = 1337; // special code for visual lost
+   const float LOSTVISUAL = 1337;
+
+   if (area < 1 || centerY > LOSTVISUAL - 1) {
+      correction_speed = LOSTVISUAL; // special code for visual lost
    }
    else {
-      float optimal_area = 7000; // default optimal area
+      float optimal_area = 7500; // default optimal area
       float area_diff = (float)area - (float) *prev_area; // looks at how much car has accelerated/deccelerated
+      float accel_area_diff_thresh = 50;
+      float brake_area_diff_thresh = 600;
 
-      if (area_diff < -500) { // If the car is moving away
-         optimal_area = optimal_area + (area_diff * 0.7f); // dampen (softly) accelerate
+      if (area_diff < accel_area_diff_thresh) { // If the car is moving away
+         optimal_area = optimal_area + (area_diff * 0.2f); // dampen (softly) accelerate
       }
 
-      if (area_diff >= 800) {
+      if (area_diff >= brake_area_diff_thresh) {
          // make optimal area farther(smaller) if the car has accelerated a lot to brake earlier and harder.
          // small differences dont make much of a difference - deals with large variations of area
          optimal_area = optimal_area - (area_diff * 1.5f);
       }
-      cout << "         // Area diff: " << area_diff << "//    ";
+      cout << endl << "         // Area diff: " << area_diff << "//    ";
       cout << "New Opt Area: " << optimal_area << "//" << endl;
 
    // the Integral and Derivative was not used due to time constraints.
@@ -323,8 +329,8 @@ void checkCarDistance(double *prev_area, double area, double centerY, OD4Session
       if (correction_speed <= 0) { correction_speed = correction_speed * 5; } // hard multiplier by 5
 
    // If the car in front has somewhat been maintaining the distance
-      if (area_diff >= -500 && area_diff < 800) {
-         correction_speed = -0.001f; // Artificial "Letting go of the pedal"
+      if (area_diff >= accel_area_diff_thresh && area_diff < brake_area_diff_thresh) {
+         correction_speed = -0.0005f; // Artificial "Letting go of the pedal"
       }
 
       cout << " [[ area: " << area << " ]]";
@@ -343,8 +349,10 @@ void checkCarPosition(double centerX, OD4Session *od4) {
 // https://robotics.stackexchange.com/questions/9786/how-do-the-pid-parameters-kp-ki-and-kd-affect-the-heading-of-a-differential
    SteeringCorrectionRequest steering_correction;
    float correction_angle;
-   if (centerX > 1336.9) { // notify movecar
-      correction_angle = 1337; // Special code for visual lost
+   const float LOSTVISUAL = 1337;
+
+   if (centerX > LOSTVISUAL - 1) { // notify movecar
+      correction_angle = LOSTVISUAL; // Special code for visual lost
    }
    else {
       float error = frame_center - (float) centerX;

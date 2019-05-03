@@ -421,9 +421,12 @@ int main(int argc, char** argv) {
      carResult[0] = 0;
      carResult[1] = 0; //clear
 
-     BrightnessAndContrastAuto(frame, brightened_frame,0.5);
       // Convert from BGR to HSV colorspace
       cvtColor(frame, frame_HSV, COLOR_BGR2HSV);
+
+      cvtColor(frame, brightened_frame, COLOR_BGR2RGB);
+      cvtColor(brightened_frame, brightened_frame, COLOR_RGB2BGR);
+      BrightnessAndContrastAuto(brightened_frame, brightened_frame);
       cvtColor(brightened_frame, saturatedFrame, COLOR_BGR2HSV);
       // what it does here is dst = (uchar) ((double)src*scale+saturation);
       // frame.convertTo(saturatedFrame, CV_8UC1, scale, saturation);

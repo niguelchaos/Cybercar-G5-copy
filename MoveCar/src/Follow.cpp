@@ -104,6 +104,8 @@ int32_t main(int32_t argc, char **argv) {
 		const float MINSTEER{(commandlineArguments["minsteer"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["minsteer"])) : static_cast<float>(-0.4)};
 		const float SAFETYDISTANCE{(commandlineArguments["safetyDistance"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["safetyDistance"])) : static_cast<float>(0.01)};
 
+		const float LOSTVISUAL = 1337;
+
       // A Data-triggered function to detect front obstacle and stop or move car accordingly
       float currentDistance{0.0};
       auto onFrontDistanceReading{ [&od4, SAFETYDISTANCE, VERBOSE, &currentDistance](cluon::data::Envelope &&envelope)
@@ -176,7 +178,7 @@ int32_t main(int32_t argc, char **argv) {
 
 
 // [Relative PID for speed correction]
-	auto onSpeedCorrection{[&od4, VERBOSE, STARTSPEED, MAXSPEED](cluon::data::Envelope &&envelope)
+	auto onSpeedCorrection{[&od4, VERBOSE, STARTSPEED, MAXSPEED, LOSTVISUAL](cluon::data::Envelope &&envelope)
 	{
 		if (!stopCarSent) {
 			auto msg = cluon::extractMessage<SpeedCorrectionRequest>(std::move(envelope));
@@ -186,20 +188,22 @@ int32_t main(int32_t argc, char **argv) {
 			{
 		    		std::cout << "Received Speed Correction message: " << amount << std::endl;
 			}
-			if (amount == 1337) {
+
+			if (amount == LOSTVISUAL) {
 				if (currentCarSpeed >= STARTSPEED) {
 					currentCarSpeed += -0.002; // car will eventually come to a stop
 					cout << "Visual Lost, reducing speed" << endl;
 				}
 			}
-
-			if ( currentCarSpeed < STARTSPEED && amount > 0) 	{ currentCarSpeed = STARTSPEED;	}// Set car speed to minimal moving car speed
-			if ( currentCarSpeed < STARTSPEED && amount < 0) 	{ currentCarSpeed = 0.0;	} // automatically makes it 0, preventing car from moving backwards
-			else {
+			else if (amount < 1) { // if normal amount
+				if ( currentCarSpeed < STARTSPEED && amount > 0 && amount < LOSTVISUAL) 	{ currentCarSpeed = STARTSPEED;	}// Set car speed to minimal moving car speed
+				if ( currentCarSpeed < STARTSPEED && amount < 0) 	{ currentCarSpeed = 0.0;	} // automatically makes it 0, preventing car from moving backwards
 				currentCarSpeed += amount;
 				if (currentCarSpeed > MAXSPEED) 	{ currentCarSpeed = MAXSPEED;	} // limit the speed car can go
 				if (currentCarSpeed < STARTSPEED){ currentCarSpeed = 0;			} // prevent the car from going backwards. Twice.
 			}
+
+
 			MoveForward(od4, currentCarSpeed, VERBOSE);
 		}
 	}
@@ -207,7 +211,7 @@ int32_t main(int32_t argc, char **argv) {
 // (Data trigger below)
 // [Absolute pid for speed was too fast]
 // Absolute pid steering
-	auto onSteeringCorrection{[&od4, VERBOSE, MAXSTEER, MINSTEER, MAXSPEED, STARTSPEED ](cluon::data::Envelope &&envelope)
+	auto onSteeringCorrection{[&od4, VERBOSE, MAXSTEER, MINSTEER, MAXSPEED, STARTSPEED, LOSTVISUAL ](cluon::data::Envelope &&envelope)
 	{
 		if (!stopCarSent) {
 			auto msg = cluon::extractMessage<SteeringCorrectionRequest>(std::move(envelope));
@@ -215,15 +219,6 @@ int32_t main(int32_t argc, char **argv) {
 			if (VERBOSE)
 			{
 				std::cout << "Absolute Steering Correction: " << amount << std::endl;
-			}
-
-			if (amount == 1337) { // slowly straighten back out the wheels if visual lost
-				if (currentSteering < 0) {
-					currentSteering += 0.05;
-				}
-				if (currentSteering > 0) {
-					currentSteering += -0.05;
-				}
 			}
 
 			// check if...
@@ -234,16 +229,38 @@ int32_t main(int32_t argc, char **argv) {
 				currentSteering = 0; // ...then reset wheels
 				cout << "Steering Reset." << endl;
 			}
-			else {
+
+			if (amount == LOSTVISUAL) { // slowly straighten back out the wheels if visual lost
+				if (currentSteering >= -0.05 && currentSteering <= 0.05) {
+					currentSteering = 0;
+				}
+				if (currentSteering < 0) { // steering right
+					currentSteering = currentSteering - (currentSteering / 10); // turn to the left
+				}
+				if (currentSteering > 0) { // steering left
+					currentSteering = currentSteering - (currentSteering / 10); // turn to the right
+				}
+				// although they should straighten, this is here just in case code goes crazy
+				if (currentSteering < MINSTEER) { currentSteering = MINSTEER; }
+				if (currentSteering > MAXSTEER) { currentSteering = MAXSTEER; }
+			}
+
+			else if (amount <= 0.4) { // if normal amount
 				currentSteering = amount;
 				if (currentSteering > MAXSTEER) {
 					currentSteering = MAXSTEER;
 
 					if (currentCarSpeed > STARTSPEED) { // slow down the car to give the car time to make it less blurry
-						currentCarSpeed = currentCarSpeed - 0.003;
+						currentCarSpeed = currentCarSpeed - 0.002;
 					}
 				}
-				if (currentSteering < MINSTEER) { currentSteering = MINSTEER; }
+				if (currentSteering < MINSTEER) {
+					currentSteering = MINSTEER;
+
+					if (currentCarSpeed > STARTSPEED) { // slow down the car to give the car time to make it less blurry
+						currentCarSpeed = currentCarSpeed - 0.002;
+					}
+				}
 			}
 			SetSteering(od4, currentSteering, VERBOSE);
 		}
