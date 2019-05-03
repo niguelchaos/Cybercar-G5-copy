@@ -157,8 +157,11 @@ int32_t main(int32_t argc, char **argv) {
 
             // Crop the frame to get useful stuff
             frame(Rect(Point(0, 0), Point(640, 370))).copyTo(cropped_frame);
+
+            // auto brighten needs to be BGR
+            cvtColor(cropped_frame, brightened, COLOR_RGB2BGR);
             // Automatically increase the brightness and contrast of the video.
-            BrightnessAndContrastAuto(cropped_frame, brightened_frame);
+            BrightnessAndContrastAuto(brightened_frame, brightened_frame);
             // Convert from BGR to HSV colorspace
             cvtColor(brightened_frame, frame_HSV, COLOR_RGB2HSV);
             // Detect the object based on HSV Range Values
@@ -170,10 +173,10 @@ int32_t main(int32_t argc, char **argv) {
 
              // Display image. For testing recordings only.
             if (VERBOSE) {
-               imshow("Pink", final_frame);
-               imshow("original frame", cropped_frame);
-               imshow("brightened bois", brightened_frame);
-               cv::waitKey(1);
+               // imshow("Pink", final_frame);
+               // imshow("original frame", cropped_frame);
+               // imshow("brightened bois", brightened_frame);
+               // cv::waitKey(1);
             }
 
             // measures FPS
