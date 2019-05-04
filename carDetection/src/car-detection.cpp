@@ -55,13 +55,13 @@ using namespace std;
 using namespace cv;
 using namespace cluon;
 
-static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, double *prev_area, OD4Session *od4);
+static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, double *prev_area, OD4Session *od4, int *max_cars);
 static void findSquares( const Mat& image, vector<vector<Point> >& squares );
 static double angle( Point pt1, Point pt2, Point pt0 );
 void checkCarIsMovingAndPosition(double *prev_area, double area, double centerX, double centerY, OD4Session *od4);
-void countCars(Mat frame, vector<Rect>& rects);
+void countCars(Mat frame, vector<Rect>& rects, int *max_cars);
 
-void BrightnessAndContrastAuto(const cv::Mat &src, cv::Mat &dst, float clipHistPercent = 0);
+void BrightnessAndContrastAuto(const cv::Mat &src, cv::Mat &dst, float clipHistPercent);
 
 int32_t main(int32_t argc, char **argv) {
    int32_t retCode{1};
@@ -103,6 +103,9 @@ int32_t main(int32_t argc, char **argv) {
          // used to determine whether car is moving and amount of acceleration
          double prev_area = 0;
          // double prev_centerY = 0;
+
+         // keeps track of the highest amount of cars
+         int max_cars = 0;
 
          // Endless loop; end the program by pressing Ctrl-C.
          while (od4.isRunning()) {
@@ -158,17 +161,18 @@ int32_t main(int32_t argc, char **argv) {
             // Crop the frame to get useful stuff
             frame(Rect(Point(0, 0), Point(640, 370))).copyTo(cropped_frame);
 
-            // auto brighten needs to be BGR
-            cvtColor(cropped_frame, brightened, COLOR_RGB2BGR);
+            // auto brighten needs to be in BGR
+            // RGB > BGR (brighten frame) > HSV (detect colors)
+            cvtColor(cropped_frame, brightened_frame, COLOR_RGB2BGR);
             // Automatically increase the brightness and contrast of the video.
-            BrightnessAndContrastAuto(brightened_frame, brightened_frame);
+            BrightnessAndContrastAuto(brightened_frame, brightened_frame, 0.5);
             // Convert from BGR to HSV colorspace
-            cvtColor(brightened_frame, frame_HSV, COLOR_RGB2HSV);
+            cvtColor(brightened_frame, frame_HSV, COLOR_BGR2HSV);
             // Detect the object based on HSV Range Values
             inRange(frame_HSV, Scalar(low_H_pink, low_S_pink, low_V_pink), Scalar(high_H_pink, high_S_pink, high_V_pink), frame_threshold);
 
             findSquares(frame_threshold, squares);
-            final_frame = drawSquares(frame_threshold, squares, &prev_area, &od4); // pass reference of prev_area
+            final_frame = drawSquares(frame_threshold, squares, &prev_area, &od4, &max_cars); // pass reference of prev_area
 
 
              // Display image. For testing recordings only.
@@ -182,7 +186,7 @@ int32_t main(int32_t argc, char **argv) {
             // measures FPS
             framecounter++;
             if (timestampsecs != prevtimestampsecs) {
-               cout << endl << "Timestamp: " << timestampsecs << "          FPS: " << framecounter ;
+               cout << endl << "Timestamp: " << timestampsecs << "          FPS: " << framecounter << endl;
                prevtimestampsecs = timestampsecs;
                framecounter = 0;
             }
@@ -319,7 +323,7 @@ void checkCarIsMovingAndPosition(
 }
 
 // the function draws all the squares in the image
-static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, double *prev_area, OD4Session *od4)
+static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, double *prev_area, OD4Session *od4, int *max_cars)
 {
    Scalar color = Scalar(255,0,0 );
    vector<Rect> boundRects( squares.size() );
@@ -357,7 +361,7 @@ static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, doubl
       Point bot_left(rect_x, rect_y + rect_height);
       Point bot_right(rect_x + rect_width, rect_y + rect_height);
 
-      countCars(image, boundRects);
+      countCars(image, boundRects, max_cars);
 
       checkCarIsMovingAndPosition( prev_area, rect_area, rect_centerX, rect_centerY, od4);
       *prev_area = rect_area; // remember this frame's area for the next frame
@@ -365,9 +369,15 @@ static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, doubl
    return image;
 }
 
-void countCars(Mat frame, vector<Rect>& rects) {
+void countCars(Mat frame, vector<Rect>& rects, int *max_cars) {
    int rect_num =  rects.size();
    std::string car_count = std::to_string(rect_num);
+   std::string max_car_count = std::to_string(*max_cars);
+
+   if (*max_cars < rect_num) {
+      *max_cars = rect_num; // remember the maximum amount of cars seen
+   }
+   cout << "  [<    MAX CARS: " << max_car_count << "  >]";
    if (rect_num == 0) {
       // cout << "No cars. ";
    }
@@ -377,6 +387,7 @@ void countCars(Mat frame, vector<Rect>& rects) {
       cout << "           [<  " << car_count << " cars. >] " << endl;
    }
    putText(frame, car_count, Point(5,100), FONT_HERSHEY_DUPLEX, 1, Scalar(255,255,255), 2);
+   putText(frame, max_car_count, Point(630,100), FONT_HERSHEY_DUPLEX, 1, Scalar(255,255,255), 2);
 }
 
 // https://answers.opencv.org/question/75510/how-to-make-auto-adjustmentsbrightness-and-contrast-for-image-android-opencv-image-correction/
@@ -438,11 +449,14 @@ void BrightnessAndContrastAuto(const cv::Mat &src, cv::Mat &dst, float clipHistP
             maxGray--;
     }
 
-    // current range
+    // current range - inputrange is always 255.
+    // maxgray is always 255. min gray is always 0.
     float inputRange = (float)maxGray - (float)minGray;
-
+    // cout << endl << "Min Gray: " << minGray << "  || Max Gray: " << maxGray << endl;
+    // cout << "Input range: " << inputRange << endl;
     alpha = (histSize - 1) / inputRange;   // alpha expands current range to histsize range
-    beta = (float)-minGray * (float)alpha;             // beta shifts current range so that minGray will go to 0
+    beta = (float)-minGray * (float)alpha; // beta shifts current range so that minGray will go to 0
+    cout << " Added Contrast: " << alpha << "   || " << " Added Brightness: " << beta << endl;
 
     // does the actual brightening.
     // Apply brightness and contrast normalization
