@@ -32,12 +32,16 @@ float currentCarSpeed = 0.0;
 float currentSteering = 0.0;
 bool stopCarSent = false;
 
+std::chrono::time_point<std::chrono::system_clock> lastTimeZeroSpeed;
+float previousSpeed = 0.1; // set previous speed to 0.1 as a start condition so that MoveForward function can see the change of speed to zero
+bool standingStillForPeriodOfTime = false;
+
 void SetSpeed(cluon::OD4Session& od4, float speed, bool VERBOSE)
 {
 	opendlv::proxy::PedalPositionRequest pedalReq;
 	pedalReq.position(speed);
 	od4.send(pedalReq);
-	if (VERBOSE) std::cout << "[ Speed: " << speed << " ] //	"<< std::endl;
+	if (VERBOSE) std::cout << "[ Speed: " << speed << " ] //	" << std::endl;
 }
 
 void StopCar(cluon::OD4Session& od4, bool VERBOSE)
@@ -50,6 +54,22 @@ void MoveForward(cluon::OD4Session& od4, float speed, bool VERBOSE)
 {
 	SetSpeed(od4, speed, VERBOSE);
 	// if (VERBOSE) std::cout << "Now move forward ... " << std::endl;
+	
+	if (standingStillForPeriodOfTime == false) { // The car was never still for a period of time
+		if (previousSpeed != 0.0 && speed == 0.0) { 
+			lastTimeZeroSpeed = std::chrono::system_clock::now(); // Take time stamp when car stopped
+		} else if (previousSpeed == 0.0 && speed == 0.0) { 
+			// Inspired by: https://en.cppreference.com/w/cpp/chrono/system_clock/now and https://en.cppreference.com/w/cpp/chrono
+			auto now = std::chrono::system_clock::now();
+			std::chrono::duration<double> elapsed_seconds = now-lastTimeZeroSpeed; // Calculate the time the car stands still
+			if (elapsed_seconds.count() >= 5) {
+				standingStillForPeriodOfTime = true;
+	    			std::cout << "Not moving for 5 seconds. We are standing behind a car at the intersection. \n";
+			}
+		}
+
+		previousSpeed = speed;
+	}
 }
 
 void SetSteering(cluon::OD4Session& od4, float steer, bool VERBOSE)
@@ -130,19 +150,6 @@ int32_t main(int32_t argc, char **argv) {
    };
 	od4.dataTrigger(opendlv::proxy::DistanceReading::ID(), onFrontDistanceReading);
 
-		// Receive StopCar message and stops the car. This is reaction on stop sign detection
-// 		auto onStopCar{ [&od4, VERBOSE](cluon::data::Envelope&&) {
-// 			if (!stopCarSent) {
-// 				if (VERBOSE) {
-// 					std::cout << "Received Stop car message: " << std::endl;
-// 				}
-// 				stopCarSent = true;
-// 				StopCar(od4, VERBOSE);
-// 			}
-// 		}
-// 	};
-//   od4.dataTrigger(StopCarRequest::ID(), onStopCar);
-
 
 	//Bool message for stoping the car
    auto onStopCar{[&od4, VERBOSE](cluon::data::Envelope &&envelope)
@@ -157,10 +164,8 @@ int32_t main(int32_t argc, char **argv) {
 			}
 
 			if (stopSignPresence==true){
-
-
-			stopCarSent = true;
-			StopCar(od4, VERBOSE);
+				stopCarSent = true;
+				StopCar(od4, VERBOSE);
 			}
 
 
@@ -174,11 +179,39 @@ int32_t main(int32_t argc, char **argv) {
         };
         od4.dataTrigger(StopSignPresenceUpdate::ID(), onStopCar);
 
+/*
+   auto onStopCar{[&od4, VERBOSE](cluon::data::Envelope &&envelope)
+            {
+		
+		auto msg = cluon::extractMessage<StopSignPresenceUpdate>(std::move(envelope));
+		bool stopSignPresence = msg.stopSignPresence(); // Get the bool
+		
+		if (standingStillForPeriodOfTime) { // Listen to stop sign message after car was still for period of time
+			if (VERBOSE)
+			{
+		    		std::cout << "Received Stop car message: " << std::endl;
+			}
+
+			if (stopCarSent == false && stopSignPresence==true){
+				stopCarSent = true;
+			}
+
+			if (stopCarSent == true && stopSignPresence==false){
+				MoveForward (od4, 0.13, VERBOSE);
+				std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+				StopCar(od4, VERBOSE);
+			}
+		}
+	
+	    }
+        };
+        od4.dataTrigger(StopSignPresenceUpdate::ID(), onStopCar);
+*/
 
 // [Relative PID for speed correction]
 	auto onSpeedCorrection{[&od4, VERBOSE, STARTSPEED, MAXSPEED](cluon::data::Envelope &&envelope)
 	{
-		if (!stopCarSent) {
+		if (!standingStillForPeriodOfTime) { // Don't listen corrections if car was still for period of time
 			auto msg = cluon::extractMessage<SpeedCorrectionRequest>(std::move(envelope));
 			float amount = msg.amount(); // Get the amount
 
@@ -202,7 +235,7 @@ int32_t main(int32_t argc, char **argv) {
 // Absolute pid steering
 	auto onSteeringCorrection{[&od4, VERBOSE, MAXSTEER, MINSTEER, MAXSPEED, STARTSPEED ](cluon::data::Envelope &&envelope)
 	{
-		if (!stopCarSent) {
+		if (!standingStillForPeriodOfTime) { // Don't listen corrections if car was still for period of time
 			auto msg = cluon::extractMessage<SteeringCorrectionRequest>(std::move(envelope));
 		  	float amount = msg.amount(); // Get the amount
 			if (VERBOSE)
@@ -231,6 +264,25 @@ int32_t main(int32_t argc, char **argv) {
 // triggers - ordering is probably important
        od4.dataTrigger(SteeringCorrectionRequest::ID(), onSteeringCorrection); //check steering correction first
 	    od4.dataTrigger(SpeedCorrectionRequest::ID(), onSpeedCorrection);
+	
+
+
+	// Function to move forward to approach the stop line
+	auto onCarOutOfSight{[&od4, VERBOSE, STARTSPEED ](cluon::data::Envelope &&envelope)
+	{
+		auto msg = cluon::extractMessage<CarOutOfSight>(std::move(envelope));
+	  	
+		if (standingStillForPeriodOfTime == true) {
+			if (VERBOSE)
+			{
+				std::cout << "Car out of sight! Approach the stop line until stop sign is out of sight! " << std::endl;
+			}
+
+			MoveForward(od4, STARTSPEED, VERBOSE);
+		}
+	}};
+	od4.dataTrigger(CarOutOfSight::ID(), onCarOutOfSight); 
+
 
         while(od4.isRunning()) {
 // only sends messages
@@ -251,25 +303,13 @@ int32_t main(int32_t argc, char **argv) {
 		steeringCorrection.amount(-1);
 		od4.send(steeringCorrection);
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-
-		StopCarRequest stopCar;
-		od4.send(stopCar);
 
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-
-		SpeedCorrectionRequest speedCorrection2;
-		speedCorrection2.amount(-1);
-		od4.send(speedCorrection2);
-
 
 		StopSignPresenceUpdate stopSign;
 		stopSign.stopSignPresence(true);
-		od4.send(stopSign);*/
-
-	/*if (!stopCarSent){
-	MoveForward (od4, 0.13, VERBOSE);
-	}*/
+		od4.send(stopSign);*/	
+		
 		}
 		return 0;
 	}
