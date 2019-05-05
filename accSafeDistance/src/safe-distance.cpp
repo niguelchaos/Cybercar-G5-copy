@@ -55,12 +55,13 @@ using namespace std;
 using namespace cv;
 using namespace cluon;
 
-static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int followcar, OD4Session *od4, double *prev_area);
+static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int followcar, OD4Session *od4, double *prev_area, bool *lost_visual);
 static void findSquares( const Mat& image, vector<vector<Point> >& squares );
 static double angle( Point pt1, Point pt2, Point pt0 );
 void countCars(Mat frame, vector<Rect>& rects);
 void checkCarPosition(double centerX, OD4Session *od4) ;
 void checkCarDistance(double *prev_area, double area, double centerY, OD4Session *od4);
+void stopLineLostVisual(OD4Session *od4, int *lost_visual_sec_count);
 
 int32_t main(int32_t argc, char **argv) {
    int32_t retCode{1};
@@ -100,6 +101,8 @@ int32_t main(int32_t argc, char **argv) {
 
          double prev_area = 0; // used to determine whether car is moving and amount of acceleration
 
+         bool lost_visual = false;
+         int lost_visual_sec_count = 0;
          // Endless loop; end the program by pressing Ctrl-C.
          while (od4.isRunning()) {
             Mat frame;
@@ -162,7 +165,7 @@ int32_t main(int32_t argc, char **argv) {
             // inRange(frame_HSV, Scalar(low_H_green, low_S_green, low_V_green), Scalar(high_H_green, high_S_green, high_V_green), frame_threshold_green);
 
             findSquares(frame_threshold_pink, pinkSquares);
-            finalFramePink = drawSquares(frame_threshold_pink, pinkSquares, 1, &od4, &prev_area); // pass reference of prev_area
+            finalFramePink = drawSquares(frame_threshold_pink, pinkSquares, 1, &od4, &prev_area, &lost_visual); // pass reference of prev_area
 
             // findSquares(frame_threshold_green, greenSquares);
             // finalFrameGreen = drawSquares(frame_threshold_green, greenSquares, 0, &od4);
@@ -177,6 +180,10 @@ int32_t main(int32_t argc, char **argv) {
             // measures FPS
             framecounter++;
             if (timestampsecs != prevtimestampsecs) {
+               // framecounter > 2 reduces accidental increases due to startup of image
+               if (lost_visual == true && framecounter > 2) { stopLineLostVisual(&od4, &lost_visual_sec_count); }
+               // reset if car is seen again
+               if (lost_visual == false) {   lost_visual_sec_count = 0;  }
                cout << "Timestamp: " << timestampsecs << "          FPS: " << framecounter << endl;
                prevtimestampsecs = timestampsecs;
                framecounter = 0;
@@ -335,9 +342,20 @@ void checkCarPosition(double centerX, OD4Session *od4) {
    od4->send(steering_correction);
 }
 
+void stopLineLostVisual(OD4Session *od4, int *lost_visual_sec_count) {
+   CarOutOfSight car_outta_sight;
+   *lost_visual_sec_count += 1;
+   cout << "lost visual secs: " << *lost_visual_sec_count << endl;
+
+   if (*lost_visual_sec_count > 2) {
+      cout << "Lost Visual Sent. Seconds reset." << endl;
+      *lost_visual_sec_count = 0;
+      od4->send(car_outta_sight);
+   }
+}
+
 // the function draws all the squares in the image
-// followcar variable - 0 = pink/other car, 1 = green/acc car
-static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int followcar, OD4Session *od4, double *prev_area)
+static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int followcar, OD4Session *od4, double *prev_area, bool *lost_visual)
 {
    Scalar color = Scalar(255,0,0 );
    vector<Rect> boundRects( squares.size() );
@@ -352,6 +370,14 @@ static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int f
    }
 
    groupRectangles(boundRects, group_thresh, merge_box_diff);  //group overlapping rectangles into 1
+
+   // if there are no bounding Rects....
+   if (boundRects.size() < 1) {
+      // ...notify Movecar component that car is nowhere to be seen / lost visual
+      *lost_visual = true;
+      cout << " | Lost Visual | ";
+   }
+
 
    // only check distance and steering corrections, along with number of cars, after merging.
    for (size_t i = 0; i < boundRects.size(); i++) {
@@ -379,6 +405,7 @@ static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int f
         checkCarDistance( prev_area, rect_area, rect_centerY, od4);
         checkCarPosition( rect_centerX, od4);
         *prev_area = rect_area; // remember this frame's area for the next frame
+        *lost_visual = false;
       }
    }
    return image;
