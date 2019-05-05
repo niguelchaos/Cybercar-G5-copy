@@ -14,6 +14,7 @@
 #include "opencv2/objdetect/objdetect.hpp"
 #include <opencv2/dnn.hpp>
 #include <cstring>
+#include <vector>
 
 #include "cluon-complete.hpp"
 #include "opendlv-standard-message-set.hpp"
@@ -285,10 +286,13 @@ void BrightnessAndContrastAuto(const cv::Mat &src, cv::Mat &dst, float clipHistP
     if (src.type() == CV_8UC1) gray = src;
     else if (src.type() == CV_8UC3) cvtColor(src, gray, COLOR_BGR2GRAY);
     else if (src.type() == CV_8UC4) cvtColor(src, gray, COLOR_BGRA2GRAY);
+
+    imshow("before brighten", gray);
     if (clipHistPercent == 0)
     {
         // keep full available range
         // Finds the global minimum and maximum in an array.
+        cout << "Min:  || " << minGray << "Max" << maxGray << "||" << endl;
         cv::minMaxLoc(gray, &minGray, &maxGray);
     }
     else
@@ -304,24 +308,29 @@ void BrightnessAndContrastAuto(const cv::Mat &src, cv::Mat &dst, float clipHistP
         // calculate cumulative distribution from the histogram
         std::vector<float> accumulator(histSize);
         accumulator[0] = hist.at<float>(0);
-        for (int i = 1; i < histSize; i++)
+        for (int i = 1; i < histSize; i++) // 1 - 255
         {
             accumulator[i] = accumulator[i - 1] + hist.at<float>(i);
+            cout << "accumulator [" << i << "]: " << accumulator[i] << endl;
         }
 
         // locate points that cuts at required value
         float max = accumulator.back();
         clipHistPercent *= (max / 100.0); //make percent as absolute
+        cout << "clipHistPercent % : " << clipHistPercent << endl;
         clipHistPercent /= 2.0; // left and right wings
+        cout << "clipHistPercent L/R wings : " << clipHistPercent << endl;
         // locate left cut
         minGray = 0;
-        while (accumulator[minGray] < clipHistPercent)
-            minGray++;
-
+        while (accumulator[minGray] < clipHistPercent) {
+           minGray++;
+        }
         // locate right cut
         maxGray = histSize - 1;
-        while (accumulator[maxGray] >= (max - clipHistPercent))
-            maxGray--;
+        while (accumulator[maxGray] >= (max - clipHistPercent)) {
+           maxGray--;
+        }
+        cout << "Min:  " << minGray << "  ||  Max" << maxGray << "   || " << endl;
     }
 
     // current range
@@ -329,10 +338,13 @@ void BrightnessAndContrastAuto(const cv::Mat &src, cv::Mat &dst, float clipHistP
 
     alpha = (histSize - 1) / inputRange;   // alpha expands current range to histsize range
     beta = -minGray * alpha;             // beta shifts current range so that minGray will go to 0
+    cout << " Added Contrast: " << alpha << "   || " << " Added Brightness: " << beta << endl;
 
     // Apply brightness and contrast normalization
     // convertTo operates with saturate_cast
+
     src.convertTo(dst, -1, alpha, beta);
+   imshow("after brighten", dst);
 
     // restore alpha channel from source
     if (dst.type() == CV_8UC4)
@@ -358,6 +370,12 @@ int main(int argc, char** argv) {
    Mat saturated_frame_threshold_pink;
    vector<vector<Point> > pinkSquares;
    vector<vector<Point> > yellowSquares;
+
+   // // READ RGB color image and convert it to Lab
+   // Mat frame_LAB;
+   // Mat clahe_frame;
+   // Mat final_clahe_frame;
+   // Mat final_clahe_frame_HSV;
 
    const int max_value_H = 360/2;
    const int max_value = 255;
@@ -424,10 +442,34 @@ int main(int argc, char** argv) {
       // Convert from BGR to HSV colorspace
       cvtColor(frame, frame_HSV, COLOR_BGR2HSV);
 
+// https://stackoverflow.com/questions/24341114/simple-illumination-correction-in-images-opencv-c
+// clahe
+      // cvtColor(frame, frame_LAB, COLOR_BGR2Lab);
+      //
+      // // Extract the L channel
+      // vector<cv::Mat> lab_planes(3);
+      // cv::split(frame_LAB, lab_planes);  // now we have the L image in lab_planes[0]
+      //
+      // // apply the CLAHE algorithm to the L channel
+      // Ptr<CLAHE> clahe = createCLAHE();
+      // clahe->setClipLimit(1.8);
+      //
+      // imshow("before brighten", lab_planes[0]);
+      // clahe->apply(lab_planes[0], clahe_frame);
+      // imshow("after brighten", lab_planes[0]);
+      // // Merge the the color planes back into an Lab image
+      // clahe_frame.copyTo(lab_planes[0]);
+      // cv::merge(lab_planes, frame_LAB);
+      //
+      // // convert back to RGB
+      // cvtColor(frame_LAB, final_clahe_frame, COLOR_Lab2BGR);
+      // cvtColor(final_clahe_frame, final_clahe_frame_HSV, COLOR_BGR2HSV);
+
       cvtColor(frame, brightened_frame, COLOR_BGR2RGB);
       cvtColor(brightened_frame, brightened_frame, COLOR_RGB2BGR);
-      BrightnessAndContrastAuto(brightened_frame, brightened_frame);
+      BrightnessAndContrastAuto(brightened_frame, brightened_frame, 0.6);
       cvtColor(brightened_frame, saturatedFrame, COLOR_BGR2HSV);
+
       // what it does here is dst = (uchar) ((double)src*scale+saturation);
       // frame.convertTo(saturatedFrame, CV_8UC1, scale, saturation);
 
@@ -435,7 +477,7 @@ int main(int argc, char** argv) {
       inRange(frame_HSV, Scalar(low_H_pink, low_S_pink, low_V_pink), Scalar(high_H_pink, high_S_pink, high_V_pink), frame_threshold_pink);
       // inRange(frame_HSV, Scalar(low_H_yellow, low_S_yellow, low_V_yellow), Scalar(high_H_yellow, high_S_yellow, high_V_yellow), frame_threshold_yellow);
 
-      inRange(saturatedFrame, Scalar(low_H_pink, low_S_pink, low_V_pink), Scalar(high_H_pink, high_S_pink, high_V_pink), saturated_frame_threshold_pink);
+      // inRange(final_clahe_frame, Scalar(low_H_pink, low_S_pink, low_V_pink), Scalar(high_H_pink, high_S_pink, high_V_pink), saturated_frame_threshold_pink);
       // inRange(saturatedFrame, Scalar(low_H_yellow, low_S_yellow, low_V_yellow), Scalar(high_H_yellow, high_S_yellow, high_V_yellow), frame_threshold_yellow);
       // convert it into grayscale and blur it to get rid of the noise.
 
@@ -444,8 +486,8 @@ int main(int argc, char** argv) {
       findSquares(frame_threshold_pink, pinkSquares);
       finalFramePink = drawSquares(frame_threshold_pink, pinkSquares, 0, carResult);
 
-      findSquares(saturated_frame_threshold_pink, pinkSquares);
-      finalSatFramePink = drawSquares(saturated_frame_threshold_pink, pinkSquares, 0, carResult);
+      // findSquares(saturated_frame_threshold_pink, pinkSquares);
+      // finalSatFramePink = drawSquares(saturated_frame_threshold_pink, pinkSquares, 0, carResult);
 
       // findSquares(frame_threshold_yellow, yellowSquares);
       // finalFrameYellow = drawSquares(frame_threshold_yellow, yellowSquares, 1, carResult);
@@ -464,8 +506,8 @@ int main(int argc, char** argv) {
       imshow("PinkOrig", finalFramePink);
       imshow("Original", frame);
       // imshow("Yellow", finalFrameYellow);
-      imshow ("Sat Pink", finalSatFramePink);
-      imshow("brightened boiiii", brightened_frame);
+      // imshow ("Sat Pink", finalSatFramePink);
+      // imshow("brightened boiiii", final_clahe_frame);
 
       // // show image with the tracked object
       // imshow("tracker",frame);
