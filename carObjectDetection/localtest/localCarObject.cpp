@@ -53,7 +53,8 @@ int main(int argc, char** argv) {
 
    //Loading the haar cascade
    //"../cars.xml" because the build file is in another folder, necessary to build for testing
-   //classifier taken from https://github.com/AdityaPai2398/Vehicle-And-Pedestrian-Detection-Using-Haar-Cascades
+   //classifier trained by ourseves using this youtube tutorial as guidance https://www.youtube.com/watch?time_continue=203&v=WEzm7L5zoZE
+   //The pictures taken for the classifier where from: https://github.com/chalmers-revere/opendlv-kiwi-data/tree/master/kiwi_detection
    carsCascadeName = "../cars.xml";
    if(!carsCascadeClassifier.load(carsCascadeName)){printf("--(!)Error loading stopsign cascade\n"); return -1; };
 
