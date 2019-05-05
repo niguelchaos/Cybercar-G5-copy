@@ -208,9 +208,10 @@ void detectAndDisplayStopSign( Mat frame, OD4Session *od4)
                     std::cout << "sending stop sign detected message: " << std::endl;
                 } else {
                     std::cout << "sending NO stop sign present message: " << std::endl;
+                    od4->send(stopSignPresenceUpdate);
                 }
-                od4->send(stopSignPresenceUpdate);
+               // od4->send(stopSignPresenceUpdate);
             }
     // -- Opens a new window with the Stop sign recognition on
-    imshow( "stopSign", frame );
+   // imshow( "stopSign", frame );
 }
