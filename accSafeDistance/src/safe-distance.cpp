@@ -61,7 +61,7 @@ static double angle( Point pt1, Point pt2, Point pt0 );
 void countCars(Mat frame, vector<Rect>& rects);
 void checkCarPosition(double centerX, OD4Session *od4) ;
 void checkCarDistance(double *prev_area, double area, double centerY, OD4Session *od4);
-void BrightnessAndContrastAuto(const cv::Mat &src, cv::Mat &dst, float clipHistPercent = 0);
+void BrightnessAndContrastAuto(const cv::Mat &src, cv::Mat &dst, float clipHistPercent);
 
 int32_t main(int32_t argc, char **argv) {
    int32_t retCode{1};
@@ -107,7 +107,9 @@ int32_t main(int32_t argc, char **argv) {
             Mat frame_HSV;
             Mat frame_gray;
             Mat cropped_frame;
+            Mat cropped_frame_BGR;
             Mat brightened_frame;
+
             Mat frame_threshold_pink;
             Mat frame_threshold_green;
             Mat finalFramePink;
@@ -159,10 +161,11 @@ int32_t main(int32_t argc, char **argv) {
             frame(Rect(Point(0, 0), Point(640, 370))).copyTo(cropped_frame);
 
             // auto brighten src needs to either be in gray or BGR
-            cvtColor(cropped_frame, brightened_frame, COLOR_RGB2BGR);
+            cvtColor(cropped_frame, cropped_frame_BGR, COLOR_RGB2BGR);
             // Automatically increase the brightness and contrast of the video.
-            BrightnessAndContrastAuto(brightened_frame, brightened_frame);
+            BrightnessAndContrastAuto(cropped_frame_BGR, brightened_frame, 0.7f);
             // Convert from BGR to HSV colorspace
+            // cvtColor(brightened_frame, brightened_frame, COLOR_BGRA2RGB);
             cvtColor(brightened_frame, frame_HSV, COLOR_BGR2HSV);
             // Detect the object based on HSV Range Values
             inRange(frame_HSV, Scalar(low_H_pink, low_S_pink, low_V_pink), Scalar(high_H_pink, high_S_pink, high_V_pink), frame_threshold_pink);
@@ -471,6 +474,7 @@ void BrightnessAndContrastAuto(const cv::Mat &src, cv::Mat &dst, float clipHistP
         // keep full available range
         // Finds the global minimum and maximum in an array.
         cv::minMaxLoc(gray, &minGray, &maxGray);
+      cout << "Min:  || " << minGray << "Max" << maxGray << "||" << endl;
     }
     else
     {
@@ -485,31 +489,44 @@ void BrightnessAndContrastAuto(const cv::Mat &src, cv::Mat &dst, float clipHistP
         // calculate cumulative distribution from the histogram
         std::vector<float> accumulator(histSize);
         accumulator[0] = hist.at<float>(0);
+        cout << "accumulator [0]: " << accumulator[0] << endl;
+
+
         for (int i = 1; i < histSize; i++)
         {
             accumulator[i] = accumulator[i - 1] + hist.at<float>(i);
         }
 
         // locate points that cuts at required value
-        float max = accumulator.back();
+        float max = accumulator.back(); // last element of the array
+         cout << "accumulator max: " << max << endl;
         clipHistPercent *= (max / 100.0f); //make percent as absolute
+        cout << "clipHistPercent % : " << clipHistPercent << endl;
+
         clipHistPercent /= 2.0f; // left and right wings
+        cout << "clipHistPercent L/R wings : " << clipHistPercent << endl;
+
         // locate left cut
         minGray = 0;
-        while (accumulator[(long)minGray] < clipHistPercent)
-            minGray++;
-
+        while (accumulator[(long)minGray] < clipHistPercent) {
+          minGray++;
+        }
         // locate right cut
         maxGray = histSize - 1;
-        while (accumulator[(long)maxGray] >= (max - clipHistPercent))
-            maxGray--;
+        while (accumulator[(long)maxGray] >= (max - clipHistPercent)) {
+           maxGray--;
+        }
     }
+    cout << "Min:  " << minGray << "  ||  Max" << maxGray << "   || " << endl;
 
     // current range
     float inputRange = (float)maxGray - (float)minGray;
-
+    // histSize is always 255
+    // inputrange in the end is always from 0 to 255
+    // maxgray is always 255 as well, and mingray is always 0 in the end.
     alpha = (histSize - 1) / inputRange;   // alpha expands current range to histsize range
-    beta = (float)-minGray * (float)alpha;             // beta shifts current range so that minGray will go to 0
+    beta = (float)-minGray * (float)alpha;  // beta shifts current range so that minGray will go to 0
+    cout << " Added Contrast: " << alpha << "   || " << " Added Brightness: " << beta << endl;
 
     // does the actual brightening.
     // Apply brightness and contrast normalization
