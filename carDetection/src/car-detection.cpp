@@ -165,7 +165,7 @@ int32_t main(int32_t argc, char **argv) {
             // RGB > BGR (brighten frame) > HSV (detect colors)
             cvtColor(cropped_frame, brightened_frame, COLOR_RGB2BGR);
             // Automatically increase the brightness and contrast of the video.
-            BrightnessAndContrastAuto(brightened_frame, brightened_frame, 0.5);
+            BrightnessAndContrastAuto(brightened_frame, brightened_frame, 0.7f);
             // Convert from BGR to HSV colorspace
             cvtColor(brightened_frame, frame_HSV, COLOR_BGR2HSV);
             // Detect the object based on HSV Range Values
@@ -415,6 +415,7 @@ void BrightnessAndContrastAuto(const cv::Mat &src, cv::Mat &dst, float clipHistP
         // keep full available range
         // Finds the global minimum and maximum in an array.
         cv::minMaxLoc(gray, &minGray, &maxGray);
+        cout << "Min:  || " << minGray << "Max" << maxGray << "||" << endl;
     }
     else
     {
@@ -429,6 +430,8 @@ void BrightnessAndContrastAuto(const cv::Mat &src, cv::Mat &dst, float clipHistP
         // calculate cumulative distribution from the histogram
         std::vector<float> accumulator(histSize);
         accumulator[0] = hist.at<float>(0);
+        cout << "accumulator [0]: " << accumulator[0] << endl;
+
         for (int i = 1; i < histSize; i++)
         {
             accumulator[i] = accumulator[i - 1] + hist.at<float>(i);
@@ -436,23 +439,30 @@ void BrightnessAndContrastAuto(const cv::Mat &src, cv::Mat &dst, float clipHistP
 
         // locate points that cuts at required value
         float max = accumulator.back();
+        cout << "accumulator max: " << max << endl;
+
         clipHistPercent *= (max / 100.0f); //make percent as absolute
+        cout << "clipHistPercent % : " << clipHistPercent << endl;
+
         clipHistPercent /= 2.0f; // left and right wings
+        cout << "clipHistPercent L/R wings : " << clipHistPercent << endl;
+
         // locate left cut
         minGray = 0;
-        while (accumulator[(long)minGray] < clipHistPercent)
-            minGray++;
+        while (accumulator[(long)minGray] < clipHistPercent) {
+           minGray++;
+        }
 
         // locate right cut
         maxGray = histSize - 1;
-        while (accumulator[(long)maxGray] >= (max - clipHistPercent))
-            maxGray--;
+        while (accumulator[(long)maxGray] >= (max - clipHistPercent)) {
+           maxGray--;
+        }
     }
-
+    cout << "Min:  " << minGray << "  ||  Max" << maxGray << "   || " << endl;
     // current range - inputrange is always 255.
     // maxgray is always 255. min gray is always 0.
     float inputRange = (float)maxGray - (float)minGray;
-    // cout << endl << "Min Gray: " << minGray << "  || Max Gray: " << maxGray << endl;
     // cout << "Input range: " << inputRange << endl;
     alpha = (histSize - 1) / inputRange;   // alpha expands current range to histsize range
     beta = (float)-minGray * (float)alpha; // beta shifts current range so that minGray will go to 0
