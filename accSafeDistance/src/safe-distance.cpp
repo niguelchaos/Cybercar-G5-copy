@@ -55,7 +55,7 @@ using namespace std;
 using namespace cv;
 using namespace cluon;
 
-static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int followcar, OD4Session *od4, double *prev_area, int *lost_visual_frame_counter);
+static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, OD4Session *od4, double *prev_area, int *lost_visual_frame_counter);
 static void findSquares( const Mat& image, vector<vector<Point> >& squares );
 static double angle( Point pt1, Point pt2, Point pt0 );
 void countCars(Mat frame, vector<Rect>& rects);
@@ -165,7 +165,7 @@ int32_t main(int32_t argc, char **argv) {
             // inRange(frame_HSV, Scalar(low_H_green, low_S_green, low_V_green), Scalar(high_H_green, high_S_green, high_V_green), frame_threshold_green);
 
             findSquares(frame_threshold_pink, pinkSquares);
-            finalFramePink = drawSquares(frame_threshold_pink, pinkSquares, 1, &od4, &prev_area, &lost_visual_frame_counter); // pass reference of prev_area
+            finalFramePink = drawSquares(frame_threshold_pink, pinkSquares, &od4, &prev_area, &lost_visual_frame_counter); // pass reference of prev_area
 
             // findSquares(frame_threshold_green, greenSquares);
             // finalFrameGreen = drawSquares(frame_threshold_green, greenSquares, 0, &od4);
@@ -356,7 +356,7 @@ void stopLineLostVisual(OD4Session *od4, int *lost_visual_sec_count) {
 }
 
 // the function draws all the squares in the image
-static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int followcar, OD4Session *od4, double *prev_area, int *lost_visual_frame_counter)
+static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, OD4Session *od4, double *prev_area, int *lost_visual_frame_counter)
 {
    Scalar color = Scalar(255,0,0 );
    vector<Rect> boundRects( squares.size() );
@@ -401,17 +401,10 @@ static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int f
       Point bot_left(rect_x, rect_y + rect_height);
       Point bot_right(rect_x + rect_width, rect_y + rect_height);
 
-      if (followcar == 0) {   // if 0, they are other cars.
-         // if not car we are following, they are other cars. count them.
-         countCars(image, boundRects);
-      }
-
-      if (followcar == 1) {   // 1 = if car is the one we are following, check position and distance
-        checkCarDistance( prev_area, rect_area, rect_centerY, od4);
-        checkCarPosition( rect_centerX, od4);
-        *prev_area = rect_area; // remember this frame's area for the next frame
-        *lost_visual_frame_counter = 0; // resets everything if a car is seen again
-      }
+     checkCarDistance( prev_area, rect_area, rect_centerY, od4);
+     checkCarPosition( rect_centerX, od4);
+     *prev_area = rect_area; // remember this frame's area for the next frame
+     *lost_visual_frame_counter = 0; // resets everything if a car is seen again
    }
    return image;
 }
