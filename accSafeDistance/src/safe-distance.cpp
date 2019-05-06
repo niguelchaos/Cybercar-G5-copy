@@ -55,7 +55,7 @@ using namespace std;
 using namespace cv;
 using namespace cluon;
 
-static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int followcar, OD4Session *od4, double *prev_area);
+static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, OD4Session *od4, double *prev_area);
 static void findSquares( const Mat& image, vector<vector<Point> >& squares );
 static double angle( Point pt1, Point pt2, Point pt0 );
 void countCars(Mat frame, vector<Rect>& rects);
@@ -149,14 +149,6 @@ int32_t main(int32_t argc, char **argv) {
             int high_S_pink = max_value;
             int high_V_pink = max_value;
 
-         // Green
-            // int low_H_green = 42;
-            // int low_S_green = 18;
-            // int low_V_green = 102;
-            // int high_H_green = 92;
-            // int high_S_green = 182;
-            // int high_V_green = 255;
-
             // Crop the frame to get useful stuff
             frame(Rect(Point(0, 0), Point(640, 370))).copyTo(cropped_frame);
 
@@ -165,17 +157,13 @@ int32_t main(int32_t argc, char **argv) {
             // Automatically increase the brightness and contrast of the video.
             BrightnessAndContrastAuto(cropped_frame_BGR, brightened_frame, 0.7f);
             // Convert from BGR to HSV colorspace
-            // cvtColor(brightened_frame, brightened_frame, COLOR_BGRA2RGB);
             cvtColor(brightened_frame, frame_HSV, COLOR_BGR2HSV);
             // Detect the object based on HSV Range Values
             inRange(frame_HSV, Scalar(low_H_pink, low_S_pink, low_V_pink), Scalar(high_H_pink, high_S_pink, high_V_pink), frame_threshold_pink);
             // inRange(frame_HSV, Scalar(low_H_green, low_S_green, low_V_green), Scalar(high_H_green, high_S_green, high_V_green), frame_threshold_green);
 
             findSquares(frame_threshold_pink, pinkSquares);
-            finalFramePink = drawSquares(frame_threshold_pink, pinkSquares, 1, &od4, &prev_area); // pass reference of prev_area
-
-            // findSquares(frame_threshold_green, greenSquares);
-            // finalFrameGreen = drawSquares(frame_threshold_green, greenSquares, 0, &od4);
+            finalFramePink = drawSquares(frame_threshold_pink, pinkSquares, &od4, &prev_area); // pass reference of prev_area
 
              // Display image. For testing recordings only.
             if (VERBOSE) {
@@ -302,7 +290,7 @@ void checkCarDistance(double *prev_area, double area, double centerY, OD4Session
       correction_speed = LOSTVISUAL; // special code for visual lost
    }
    else {
-      float optimal_area = 7500; // default optimal area
+      float optimal_area = 7000; // default optimal area
       float area_diff = (float)area - (float) *prev_area; // looks at how much car has accelerated/deccelerated
       float accel_area_diff_thresh = 50;
       float brake_area_diff_thresh = 600;
@@ -376,7 +364,7 @@ void checkCarPosition(double centerX, OD4Session *od4) {
 
 // the function draws all the squares in the image
 // followcar variable - 0 = pink/other car, 1 = green/acc car
-static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int followcar, OD4Session *od4, double *prev_area)
+static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, OD4Session *od4, double *prev_area)
 {
    Scalar color = Scalar(255,0,0 );
    vector<Rect> boundRects( squares.size() );
@@ -421,32 +409,11 @@ static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int f
       Point bot_left(rect_x, rect_y + rect_height);
       Point bot_right(rect_x + rect_width, rect_y + rect_height);
 
-      if (followcar == 0) {   // if 0, they are other cars.
-         // if not car we are following, they are other cars. count them.
-         countCars(image, boundRects);
-      }
-
-      if (followcar == 1) {   // 1 = if car is the one we are following, check position and distance
-        checkCarDistance( prev_area, rect_area, rect_centerY, od4);
-        checkCarPosition( rect_centerX, od4);
-        *prev_area = rect_area; // remember this frame's area for the next frame
-      }
+     checkCarDistance( prev_area, rect_area, rect_centerY, od4);
+     checkCarPosition( rect_centerX, od4);
+     *prev_area = rect_area; // remember this frame's area for the next frame
    }
    return image;
-}
-
-void countCars(Mat frame, vector<Rect>& rects) {
-   int rect_num =  rects.size();
-   std::string car_count = std::to_string(rect_num);
-   if (rect_num == 0) {
-      // cout << "No cars \n";
-   }
-   else if (rect_num == 1) {
-      cout << "            [  " << car_count << " car. ]  \n \n";
-   } else {
-      cout << "            [  " << car_count << " cars. ]  \n \n";
-   }
-   putText(frame, car_count, Point(5,100), FONT_HERSHEY_DUPLEX, 1, Scalar(255,255,255), 2);
 }
 
 // https://answers.opencv.org/question/75510/how-to-make-auto-adjustmentsbrightness-and-contrast-for-image-android-opencv-image-correction/
@@ -474,7 +441,7 @@ void BrightnessAndContrastAuto(const cv::Mat &src, cv::Mat &dst, float clipHistP
         // keep full available range
         // Finds the global minimum and maximum in an array.
         cv::minMaxLoc(gray, &minGray, &maxGray);
-      cout << "Min:  || " << minGray << "Max" << maxGray << "||" << endl;
+      // cout << "Min:  || " << minGray << "Max" << maxGray << "||" << endl;
     }
     else
     {
@@ -499,9 +466,9 @@ void BrightnessAndContrastAuto(const cv::Mat &src, cv::Mat &dst, float clipHistP
 
         // locate points that cuts at required value
         float max = accumulator.back(); // last element of the array
-         cout << "accumulator max: " << max << endl;
+         // cout << "accumulator max: " << max << endl;
         clipHistPercent *= (max / 100.0f); //make percent as absolute
-        cout << "clipHistPercent % : " << clipHistPercent << endl;
+        // cout << "clipHistPercent % : " << clipHistPercent << endl;
 
         clipHistPercent /= 2.0f; // left and right wings
         cout << "clipHistPercent L/R wings : " << clipHistPercent << endl;
