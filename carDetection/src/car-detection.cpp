@@ -55,12 +55,11 @@ using namespace std;
 using namespace cv;
 using namespace cluon;
 
-static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, double *prev_area, OD4Session *od4, int *max_cars);
+static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, double *prev_area, OD4Session *od4, int *max_cars, bool *stop_line_arrived);
 static void findSquares( const Mat& image, vector<vector<Point> >& squares );
 static double angle( Point pt1, Point pt2, Point pt0 );
-void checkCarIsMovingAndPosition(double *prev_area, double area, double centerX, double centerY, OD4Session *od4);
+void checkCarIsMovingAndPosition(double *prev_area, double area, double centerX, double centerY, OD4Session *od4, bool *stop_line_arrived);
 void countCars(Mat frame, vector<Rect>& rects, int *max_cars);
-
 void BrightnessAndContrastAuto(const cv::Mat &src, cv::Mat &dst, float clipHistPercent);
 
 int32_t main(int32_t argc, char **argv) {
@@ -99,13 +98,20 @@ int32_t main(int32_t argc, char **argv) {
          // Stupid warnings say it needs to be initialized so here you go compiler stop complaining
          int64_t prevtimestampsecs = 0;
          int framecounter = 0;
-
          // used to determine whether car is moving and amount of acceleration
          double prev_area = 0;
-         // double prev_centerY = 0;
-
          // keeps track of the highest amount of cars
          int max_cars = 0;
+
+         bool stop_line_arrived = false;
+         // Listen for when the car has arrived at stop line
+   		auto onArrivedAtStopLine {
+            [&od4, &stop_line_arrived](cluon::data::Envelope&&) {
+					cout << "We have arrived at the stop line. " << endl;
+   				stop_line_arrived = true;
+            }
+         };
+         od4.dataTrigger(ArrivedAtStopLine::ID(), onArrivedAtStopLine);
 
          // Endless loop; end the program by pressing Ctrl-C.
          while (od4.isRunning()) {
@@ -172,7 +178,7 @@ int32_t main(int32_t argc, char **argv) {
             inRange(frame_HSV, Scalar(low_H_pink, low_S_pink, low_V_pink), Scalar(high_H_pink, high_S_pink, high_V_pink), frame_threshold);
 
             findSquares(frame_threshold, squares);
-            final_frame = drawSquares(frame_threshold, squares, &prev_area, &od4, &max_cars); // pass reference of prev_area
+            final_frame = drawSquares(frame_threshold, squares, &prev_area, &od4, &max_cars, &stop_line_arrived); // pass reference of prev_area
 
 
              // Display image. For testing recordings only.
@@ -290,22 +296,33 @@ static void findSquares( const Mat& image, vector<vector<Point> >& squares ) {
 }
 
 void checkCarIsMovingAndPosition(
-   double *prev_area, double area, double centerX, double centerY, OD4Session *od4) {
+   double *prev_area, double area, double centerX, double centerY, OD4Session *od4, bool *stop_line_arrived) {
 
    float area_diff = (float)area - (float) *prev_area; // looks at whether or not car has moved
    int frame_center = 320;
-   int offset = 110;
+   int left_offset;
+   int right_offset;
+
+   if (*stop_line_arrived == false) {
+      left_offset = 110;
+      right_offset = 110;
+   }
+   if (*stop_line_arrived == true) {
+      left_offset = 320;
+      right_offset = 25;
+   }
+
 
 
    cout << " [ center X: " << centerX << " ]   // ";
    cout << "  // [[center Y: " << centerY << " ]] // " ;
-   if (centerX < frame_center - offset) {
+   if (centerX < frame_center - left_offset) {
       cout << "   << Car on left " << endl;
    }
-   if (centerX >= frame_center - offset && centerX < frame_center + offset) {
+   if (centerX >= frame_center - left_offset && centerX < frame_center + right_offset) {
       cout << "   || Car in middle ||" << endl;
    }
-   if (centerX > frame_center + offset) {
+   if (centerX > frame_center + right_offset) {
       cout << "   Car on right >>" << endl;
    }
 
@@ -323,7 +340,7 @@ void checkCarIsMovingAndPosition(
 }
 
 // the function draws all the squares in the image
-static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, double *prev_area, OD4Session *od4, int *max_cars)
+static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, double *prev_area, OD4Session *od4, int *max_cars, bool *stop_line_arrived)
 {
    Scalar color = Scalar(255,0,0 );
    vector<Rect> boundRects( squares.size() );
@@ -363,7 +380,7 @@ static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, doubl
 
       countCars(image, boundRects, max_cars);
 
-      checkCarIsMovingAndPosition( prev_area, rect_area, rect_centerX, rect_centerY, od4);
+      checkCarIsMovingAndPosition( prev_area, rect_area, rect_centerX, rect_centerY, od4, stop_line_arrived);
       *prev_area = rect_area; // remember this frame's area for the next frame
    }
    return image;
@@ -415,7 +432,7 @@ void BrightnessAndContrastAuto(const cv::Mat &src, cv::Mat &dst, float clipHistP
         // keep full available range
         // Finds the global minimum and maximum in an array.
         cv::minMaxLoc(gray, &minGray, &maxGray);
-        cout << "Min:  || " << minGray << "Max" << maxGray << "||" << endl;
+        // cout << "Min:  || " << minGray << "Max" << maxGray << "||" << endl;
     }
     else
     {
@@ -430,7 +447,7 @@ void BrightnessAndContrastAuto(const cv::Mat &src, cv::Mat &dst, float clipHistP
         // calculate cumulative distribution from the histogram
         std::vector<float> accumulator(histSize);
         accumulator[0] = hist.at<float>(0);
-        cout << "accumulator [0]: " << accumulator[0] << endl;
+        // cout << "accumulator [0]: " << accumulator[0] << endl;
 
         for (int i = 1; i < histSize; i++)
         {
@@ -439,10 +456,10 @@ void BrightnessAndContrastAuto(const cv::Mat &src, cv::Mat &dst, float clipHistP
 
         // locate points that cuts at required value
         float max = accumulator.back();
-        cout << "accumulator max: " << max << endl;
+        // cout << "accumulator max: " << max << endl;
 
         clipHistPercent *= (max / 100.0f); //make percent as absolute
-        cout << "clipHistPercent % : " << clipHistPercent << endl;
+        // cout << "clipHistPercent % : " << clipHistPercent << endl;
 
         clipHistPercent /= 2.0f; // left and right wings
         cout << "clipHistPercent L/R wings : " << clipHistPercent << endl;
