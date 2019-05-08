@@ -97,7 +97,7 @@ int32_t main(int32_t argc, char **argv) {
 		}
 
 	   const bool VERBOSE{commandlineArguments.count("verbose") != 0};
-		const float STARTSPEED{(commandlineArguments["startspeed"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["startspeed"])) : static_cast<float>(0.106)};
+		const float STARTSPEED{(commandlineArguments["startspeed"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["startspeed"])) : static_cast<float>(0.102)};
 		const float MAXSPEED{(commandlineArguments["maxspeed"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["maxspeed"])) : static_cast<float>(0.12)};
 
 		const float MAXSTEER{(commandlineArguments["maxsteer"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["maxsteer"])) : static_cast<float>(0.4)};
@@ -107,9 +107,10 @@ int32_t main(int32_t argc, char **argv) {
 		const float LOSTVISUAL = 1337;
 		const float DECELERATE = 999;
 
+		bool safety_dist_triggered = false;
       // A Data-triggered function to detect front obstacle and stop or move car accordingly
       float currentDistance{0.0};
-      auto onFrontDistanceReading{ [&od4, SAFETYDISTANCE, VERBOSE, &currentDistance](cluon::data::Envelope &&envelope)
+      auto onFrontDistanceReading{ [&od4, SAFETYDISTANCE, VERBOSE, MINSTEER, MAXSTEER, &currentDistance, &safety_dist_triggered](cluon::data::Envelope &&envelope)
       { // &<variables> will be captured by reference (instead of value only)
 	      auto msg = cluon::extractMessage<opendlv::proxy::DistanceReading>(std::move(envelope));
 			// senderStamp 0 corresponds to front ultra-sound distance sensor
@@ -124,12 +125,22 @@ int32_t main(int32_t argc, char **argv) {
 				if (currentDistance <= SAFETYDISTANCE) {
 				StopCar(od4, VERBOSE); // Stop the car if obstacle is too close
 				currentCarSpeed = 0.0;
-				if (currentSteering <= -0.3 && currentSteering >= 0.3) {
-					currentSteering = 0;
+
+				if (currentSteering < -0.2) { // steering right
+					currentSteering = currentSteering - (currentSteering / 3); // turn to the left quickly
 				}
+				if (currentSteering > 0.2) { // steering left
+					currentSteering = currentSteering - (currentSteering / 3); // turn to the right quickly
+				}
+				// although they should straighten, this is here just in case code goes crazy
+				if (currentSteering < MINSTEER) { currentSteering = MINSTEER; }
+				if (currentSteering > MAXSTEER) { currentSteering = MAXSTEER; }
+
 				SetSteering(od4, currentSteering, VERBOSE);
+				safety_dist_triggered = true; // used to override steering corrections
 				std::cout << "Obstacle too close: " << currentDistance << std::endl;
 				}
+				if (currentDistance > SAFETYDISTANCE) { safety_dist_triggered = false; }
 			}
        }
    };
@@ -181,39 +192,40 @@ int32_t main(int32_t argc, char **argv) {
 
 
 // [Relative PID for speed correction]
-	auto onSpeedCorrection{[&od4, VERBOSE, STARTSPEED, MAXSPEED, LOSTVISUAL, DECELERATE](cluon::data::Envelope &&envelope)
+	auto onSpeedCorrection{[&od4, VERBOSE, STARTSPEED, MAXSPEED, LOSTVISUAL, DECELERATE, &safety_dist_triggered](cluon::data::Envelope &&envelope)
 	{
 		if (!stopCarSent) {
-			auto msg = cluon::extractMessage<SpeedCorrectionRequest>(std::move(envelope));
-			float amount = msg.amount(); // Get the amount
+			if (safety_dist_triggered == false) {
+				auto msg = cluon::extractMessage<SpeedCorrectionRequest>(std::move(envelope));
+				float amount = msg.amount(); // Get the amount
 
-			if (VERBOSE)
-			{
-		    		std::cout << "Received Speed Correction message: " << amount << std::endl;
-			}
-
-			if (amount == LOSTVISUAL) {
-				if (currentCarSpeed >= STARTSPEED) {
-					currentCarSpeed += -0.002; // car will eventually come to a stop
-					cout << "Visual Lost, reducing speed" << endl;
+				if (VERBOSE)
+				{
+			    		std::cout << "Received Speed Correction message: " << amount << std::endl;
 				}
-			}
-			if (amount == DECELERATE) {
-				if (currentCarSpeed > (STARTSPEED + 0.004)) {
-					currentCarSpeed += -0.0008;
-					cout << "Maintaining Distance, decelerating" << endl;
+				if (amount == LOSTVISUAL) {
+					if (currentCarSpeed >= STARTSPEED) {
+						currentCarSpeed += -0.002; // car will eventually come to a stop
+						if (currentCarSpeed < STARTSPEED){ currentCarSpeed = 0; }
+						cout << "Visual Lost, reducing speed" << endl;
+					}
 				}
+				if (amount == DECELERATE) {
+					if (currentCarSpeed > STARTSPEED + 0.004) { // only begin decelerating if the car is too fast. Give the car some time to get some speed.
+						currentCarSpeed += -0.0008;
+						if (currentCarSpeed < STARTSPEED){ currentCarSpeed = 0; } // should not enter here, but if it does, here is backup.
+						cout << "Maintaining Distance, decelerating" << endl;
+					}
+				}
+				else if (amount < 1) { // if normal amount
+					if ( currentCarSpeed < STARTSPEED && amount > 0 && amount < LOSTVISUAL) 	{ currentCarSpeed = STARTSPEED;	}// Set car speed to minimal moving car speed
+					if ( currentCarSpeed < STARTSPEED && amount < 0) 	{ currentCarSpeed = 0.0;	} // automatically makes it 0, preventing car from moving backwards
+					currentCarSpeed += amount;
+					if (currentCarSpeed > MAXSPEED) 	{ currentCarSpeed = MAXSPEED;	} // limit the speed car can go
+					if (currentCarSpeed < STARTSPEED){ currentCarSpeed = 0;			} // prevent the car from going backwards. Twice.
+				}
+				MoveForward(od4, currentCarSpeed, VERBOSE);
 			}
-			else if (amount < 1) { // if normal amount
-				if ( currentCarSpeed < STARTSPEED && amount > 0 && amount < LOSTVISUAL) 	{ currentCarSpeed = STARTSPEED;	}// Set car speed to minimal moving car speed
-				if ( currentCarSpeed < STARTSPEED && amount < 0) 	{ currentCarSpeed = 0.0;	} // automatically makes it 0, preventing car from moving backwards
-				currentCarSpeed += amount;
-				if (currentCarSpeed > MAXSPEED) 	{ currentCarSpeed = MAXSPEED;	} // limit the speed car can go
-				if (currentCarSpeed < STARTSPEED){ currentCarSpeed = 0;			} // prevent the car from going backwards. Twice.
-			}
-
-
-			MoveForward(od4, currentCarSpeed, VERBOSE);
 		}
 	}
 };
