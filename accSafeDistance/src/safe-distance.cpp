@@ -144,7 +144,7 @@ int32_t main(int32_t argc, char **argv) {
          // Pink
             int low_H_pink = 135;
             int low_S_pink = 50;
-            int low_V_pink = 65;
+            int low_V_pink = 50;
             int high_H_pink = max_value_H;
             int high_S_pink = max_value;
             int high_V_pink = max_value;
@@ -160,7 +160,6 @@ int32_t main(int32_t argc, char **argv) {
             cvtColor(brightened_frame, frame_HSV, COLOR_BGR2HSV);
             // Detect the object based on HSV Range Values
             inRange(frame_HSV, Scalar(low_H_pink, low_S_pink, low_V_pink), Scalar(high_H_pink, high_S_pink, high_V_pink), frame_threshold_pink);
-            // inRange(frame_HSV, Scalar(low_H_green, low_S_green, low_V_green), Scalar(high_H_green, high_S_green, high_V_green), frame_threshold_green);
 
             findSquares(frame_threshold_pink, pinkSquares);
             finalFramePink = drawSquares(frame_threshold_pink, pinkSquares, &od4, &prev_area); // pass reference of prev_area
@@ -285,14 +284,15 @@ void checkCarDistance(double *prev_area, double area, double centerY, OD4Session
    SpeedCorrectionRequest speed_correction;
    float correction_speed;
    const float LOSTVISUAL = 1337;
+   const float DECELERATE = 999;  // code for Artificial "Letting go of the pedal"
 
    if (area < 1 || centerY > LOSTVISUAL - 1) {
       correction_speed = LOSTVISUAL; // special code for visual lost
    }
    else {
-      float optimal_area = 7000; // default optimal area
+      float optimal_area = 8000; // default optimal area
       float area_diff = (float)area - (float) *prev_area; // looks at how much car has accelerated/deccelerated
-      float accel_area_diff_thresh = 50;
+      float accel_area_diff_thresh = 0;
       float brake_area_diff_thresh = 600;
 
       if (area_diff < accel_area_diff_thresh) { // If the car is moving away
@@ -302,7 +302,7 @@ void checkCarDistance(double *prev_area, double area, double centerY, OD4Session
       if (area_diff >= brake_area_diff_thresh) {
          // make optimal area farther(smaller) if the car has accelerated a lot to brake earlier and harder.
          // small differences dont make much of a difference - deals with large variations of area
-         optimal_area = optimal_area - (area_diff * 1.5f);
+         optimal_area = optimal_area - (area_diff * 1.7f);
       }
       cout << endl << "         // Area diff: " << area_diff << "//    ";
       cout << "New Opt Area: " << optimal_area << "//" << endl;
@@ -313,7 +313,7 @@ void checkCarDistance(double *prev_area, double area, double centerY, OD4Session
       float output = kp * error;
 
       // braking needs to be stronger than accelerating, need to modify correction to suit it.
-      if (output > 0) { correction_speed = output / 1000000; }
+      if (output > 0) { correction_speed = output / 9000000; }
       if (output <= 0) { correction_speed = output / 100000; }
 
    // braking needs to be faster than accelerating. I dont care.
@@ -321,7 +321,7 @@ void checkCarDistance(double *prev_area, double area, double centerY, OD4Session
 
    // If the car in front has somewhat been maintaining the distance
       if (area_diff >= accel_area_diff_thresh && area_diff < brake_area_diff_thresh) {
-         correction_speed = -0.0005f; // Artificial "Letting go of the pedal"
+         correction_speed = DECELERATE;
       }
 
       cout << " [[ area: " << area << " ]]";
@@ -456,7 +456,7 @@ void BrightnessAndContrastAuto(const cv::Mat &src, cv::Mat &dst, float clipHistP
         // calculate cumulative distribution from the histogram
         std::vector<float> accumulator(histSize);
         accumulator[0] = hist.at<float>(0);
-        cout << "accumulator [0]: " << accumulator[0] << endl;
+        // cout << "accumulator [0]: " << accumulator[0] << endl;
 
 
         for (int i = 1; i < histSize; i++)

@@ -97,14 +97,15 @@ int32_t main(int32_t argc, char **argv) {
 		}
 
 	   const bool VERBOSE{commandlineArguments.count("verbose") != 0};
-		const float STARTSPEED{(commandlineArguments["startspeed"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["startspeed"])) : static_cast<float>(0.10)};
-		const float MAXSPEED{(commandlineArguments["maxspeed"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["maxspeed"])) : static_cast<float>(0.125)};
+		const float STARTSPEED{(commandlineArguments["startspeed"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["startspeed"])) : static_cast<float>(0.106)};
+		const float MAXSPEED{(commandlineArguments["maxspeed"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["maxspeed"])) : static_cast<float>(0.12)};
 
 		const float MAXSTEER{(commandlineArguments["maxsteer"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["maxsteer"])) : static_cast<float>(0.4)};
 		const float MINSTEER{(commandlineArguments["minsteer"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["minsteer"])) : static_cast<float>(-0.4)};
-		const float SAFETYDISTANCE{(commandlineArguments["safetyDistance"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["safetyDistance"])) : static_cast<float>(0.01)};
+		const float SAFETYDISTANCE{(commandlineArguments["safetyDistance"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["safetyDistance"])) : static_cast<float>(0.15)};
 
 		const float LOSTVISUAL = 1337;
+		const float DECELERATE = 999;
 
       // A Data-triggered function to detect front obstacle and stop or move car accordingly
       float currentDistance{0.0};
@@ -123,7 +124,9 @@ int32_t main(int32_t argc, char **argv) {
 				if (currentDistance <= SAFETYDISTANCE) {
 				StopCar(od4, VERBOSE); // Stop the car if obstacle is too close
 				currentCarSpeed = 0.0;
-				currentSteering = 0.0; // reset wheels too just in case
+				if (currentSteering <= -0.3 && currentSteering >= 0.3) {
+					currentSteering = 0;
+				}
 				SetSteering(od4, currentSteering, VERBOSE);
 				std::cout << "Obstacle too close: " << currentDistance << std::endl;
 				}
@@ -178,7 +181,7 @@ int32_t main(int32_t argc, char **argv) {
 
 
 // [Relative PID for speed correction]
-	auto onSpeedCorrection{[&od4, VERBOSE, STARTSPEED, MAXSPEED, LOSTVISUAL](cluon::data::Envelope &&envelope)
+	auto onSpeedCorrection{[&od4, VERBOSE, STARTSPEED, MAXSPEED, LOSTVISUAL, DECELERATE](cluon::data::Envelope &&envelope)
 	{
 		if (!stopCarSent) {
 			auto msg = cluon::extractMessage<SpeedCorrectionRequest>(std::move(envelope));
@@ -193,6 +196,12 @@ int32_t main(int32_t argc, char **argv) {
 				if (currentCarSpeed >= STARTSPEED) {
 					currentCarSpeed += -0.002; // car will eventually come to a stop
 					cout << "Visual Lost, reducing speed" << endl;
+				}
+			}
+			if (amount == DECELERATE) {
+				if (currentCarSpeed > (STARTSPEED + 0.004)) {
+					currentCarSpeed += -0.0008;
+					cout << "Maintaining Distance, decelerating" << endl;
 				}
 			}
 			else if (amount < 1) { // if normal amount
