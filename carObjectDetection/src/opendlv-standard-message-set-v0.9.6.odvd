@@ -380,6 +380,9 @@ message StopSignPresenceUpdate[id = 2007]{
    bool stopSignPresence [id = 1];
 }
 
+message CarPresenceUpdate [id = 2011] {
+    bool carPresence [id = 1];
+}
 
 message Helloworld [id = 2000] {
    string helloworld [id = 1];
