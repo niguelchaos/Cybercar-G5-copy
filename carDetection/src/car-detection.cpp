@@ -55,11 +55,17 @@ using namespace std;
 using namespace cv;
 using namespace cluon;
 
-static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, double *prev_area, OD4Session *od4, int *max_cars, bool *stop_line_arrived);
-static void findSquares( const Mat& image, vector<vector<Point> >& squares );
 static double angle( Point pt1, Point pt2, Point pt0 );
-void checkCarIsMovingAndPosition(double *prev_area, double area, double centerX, double centerY, OD4Session *od4, bool *stop_line_arrived);
-void countCars(Mat frame, vector<Rect>& rects, int *max_cars);
+static void findSquares( const Mat& image, vector<vector<Point> >& squares );
+static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, vector<Rect> &boundRects, OD4Session *od4);
+
+void checkCarPosition(OD4Session *od4, double *prev_centerX, double *prev_centerY, double centerX, double centerY,
+   bool *stop_line_arrived, vector<Point> &initial_car_positions);
+void countCars(Mat frame, vector<Rect>& rects, int *cars_in_queue);
+void detectCars(
+   OD4Session *od4, Mat& image, const vector<vector<Point> >& squares, vector<Rect> &boundRects,
+   double *prev_area, double *prev_centerX, double *prev_centerY,
+   int *cars_in_queue, bool *stop_line_arrived, vector<Point> &initial_car_positions);
 void BrightnessAndContrastAuto(const cv::Mat &src, cv::Mat &dst, float clipHistPercent);
 
 int32_t main(int32_t argc, char **argv) {
@@ -98,10 +104,14 @@ int32_t main(int32_t argc, char **argv) {
          // Stupid warnings say it needs to be initialized so here you go compiler stop complaining
          int64_t prevtimestampsecs = 0;
          int framecounter = 0;
-         // used to determine whether car is moving and amount of acceleration
-         double prev_area = 0;
-         // keeps track of the highest amount of cars
-         int max_cars = 0;
+
+
+         double prev_area = 0; // used to determine whether car is moving and amount of acceleration
+         double prev_centerX = 0; // used to track cars
+         double prev_centerY = 0;
+
+         int cars_in_queue = 0; // keeps track of the highest amount of cars
+         vector<Point> initial_car_positions {Point(0,0), Point(0,0), Point(0,0)}; // { left | mid | right } respectively
 
          bool stop_line_arrived = false;
          // Listen for when the car has arrived at stop line
@@ -123,6 +133,7 @@ int32_t main(int32_t argc, char **argv) {
             Mat frame_threshold;
             Mat final_frame;
             vector<vector<Point> > squares;
+            vector<Rect> boundRects;
 
             const int max_value_H = 360/2;
             const int max_value = 255;
@@ -178,9 +189,16 @@ int32_t main(int32_t argc, char **argv) {
             inRange(frame_HSV, Scalar(low_H_pink, low_S_pink, low_V_pink), Scalar(high_H_pink, high_S_pink, high_V_pink), frame_threshold);
 
             findSquares(frame_threshold, squares);
-            final_frame = drawSquares(frame_threshold, squares, &prev_area, &od4, &max_cars, &stop_line_arrived); // pass reference of prev_area
+            final_frame = drawSquares(frame_threshold, squares, boundRects, &od4);
 
-
+            detectCars(&od4, final_frame, squares, boundRects, &prev_area, &prev_centerX, &prev_centerY,
+               &cars_in_queue, &stop_line_arrived, initial_car_positions);
+            // notify movecar when it is time to go
+            if (stop_line_arrived == true && cars_in_queue == 0) {
+               TimeToYeetOutOfIntersection yeet;
+               od4.send(yeet);
+               cout << " --=== Time to leave intersection. Waiting for direction. ===-- " << endl;
+            }
              // Display image. For testing recordings only.
             if (VERBOSE) {
                // imshow("Pink", final_frame);
@@ -295,73 +313,57 @@ static void findSquares( const Mat& image, vector<vector<Point> >& squares ) {
    }
 }
 
-void checkCarIsMovingAndPosition(
-   double *prev_area, double area, double centerX, double centerY, OD4Session *od4, bool *stop_line_arrived) {
-
-   float area_diff = (float)area - (float) *prev_area; // looks at whether or not car has moved
-   int frame_center = 320;
-   int left_offset;
-   int right_offset;
-
-   if (*stop_line_arrived == false) {
-      left_offset = 110;
-      right_offset = 110;
-   }
-   if (*stop_line_arrived == true) {
-      left_offset = 320;
-      right_offset = 25;
-   }
-
-
-
-   cout << " [ center X: " << centerX << " ]   // ";
-   cout << "  // [[center Y: " << centerY << " ]] // " ;
-   if (centerX < frame_center - left_offset) {
-      cout << "   << Car on left " << endl;
-   }
-   if (centerX >= frame_center - left_offset && centerX < frame_center + right_offset) {
-      cout << "   || Car in middle ||" << endl;
-   }
-   if (centerX > frame_center + right_offset) {
-      cout << "   Car on right >>" << endl;
-   }
-
-   cout << " [[ area: " << area << " ]]";
-   cout << " // Area diff: " << area_diff << " // ";
-   if (area_diff < -100) { // If the car is moving away
-      cout << "Car moving away   " << endl;
-   }
-   if (area_diff >= -100 && area_diff < 100) {
-      cout << "car stationary " << endl;
-   }
-   if (area_diff >= 100) {
-      cout << " car coming closer   " << endl ;
-   }
-}
-
 // the function draws all the squares in the image
-static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, double *prev_area, OD4Session *od4, int *max_cars, bool *stop_line_arrived)
+static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, vector<Rect> &boundRects, OD4Session *od4)
 {
    Scalar color = Scalar(255,0,0 );
-   vector<Rect> boundRects( squares.size() );
 
    int group_thresh = 1;
    double merge_box_diff = 0.6;
 
+   boundRects.resize(squares.size());
+// since the detected square may not always be straight, a bounding box around the...square ensures that its straight
    for( size_t i = 0; i < squares.size(); i++ ) {
       // Code from http://answers.opencv.org/question/72237/measuring-width-height-of-bounding-box/
       boundRects[i] = boundingRect(squares[i]);
       rectangle(image, boundRects[i].tl(), boundRects[i].br(), color, 2 );
    }
-
    groupRectangles(boundRects, group_thresh, merge_box_diff);  //group overlapping rectangles into 1
+   cout << "rectangles grouped/merged." << endl;
+   return image;
+}
+
+void countCars(Mat frame, vector<Rect>& rects, int *cars_in_queue) {
+   int rect_num =  rects.size();
+   std::string car_count = std::to_string(rect_num);
+   std::string max_car_count = std::to_string(*cars_in_queue);
+
+   if (*cars_in_queue < rect_num) {
+      *cars_in_queue = rect_num; // remember the maximum amount of cars seen
+   }
+
+   cout << "  [<    MAX CARS: " << max_car_count << "  >]";
+   if (rect_num == 0) {
+      // cout << "No cars. ";
+   }
+   else if (rect_num == 1) {
+      cout << "           [<  " << car_count << " car. >]  " << endl;
+   } else {
+      cout << "           [<  " << car_count << " cars. >] " << endl;
+   }
+   putText(frame, car_count, Point(5,100), FONT_HERSHEY_DUPLEX, 1, Scalar(255,255,255), 2);
+   putText(frame, max_car_count, Point(630,100), FONT_HERSHEY_DUPLEX, 1, Scalar(255,255,255), 2);
+}
+
+void detectCars(
+   OD4Session *od4, Mat& image, const vector<vector<Point> >& squares, vector<Rect> &boundRects,
+   double *prev_area, double *prev_centerX, double *prev_centerY,
+   int *cars_in_queue, bool *stop_line_arrived, vector<Point> &initial_car_positions) {
 
    double rect_area = 0;
-   double rect_centerX = 1337; // valid range from 0 - 640
-   double rect_centerY = 1337; // valid range from 0 - 480
+   double rect_centerX = 0; // valid range from 0 - 640
+   double rect_centerY = 0; // valid range from 0 - 480
 
-
-   // only check distance and steering corrections, along with number of cars, after merging.
    for (size_t i = 0; i < boundRects.size(); i++) {
       int rect_x = boundRects[i].x;
       int rect_y = boundRects[i].y;
@@ -378,33 +380,87 @@ static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, doubl
       Point bot_left(rect_x, rect_y + rect_height);
       Point bot_right(rect_x + rect_width, rect_y + rect_height);
 
-      countCars(image, boundRects, max_cars);
-
-      checkCarIsMovingAndPosition( prev_area, rect_area, rect_centerX, rect_centerY, od4, stop_line_arrived);
+      if (*stop_line_arrived == false) {
+         countCars(image, boundRects, cars_in_queue);
+      }
+      checkCarPosition( od4, prev_centerX, prev_centerY, rect_centerX, rect_centerY, stop_line_arrived, initial_car_positions);
       *prev_area = rect_area; // remember this frame's area for the next frame
+      *prev_centerX = rect_centerX;
+      *prev_centerY = rect_centerY;
    }
-   return image;
 }
 
-void countCars(Mat frame, vector<Rect>& rects, int *max_cars) {
-   int rect_num =  rects.size();
-   std::string car_count = std::to_string(rect_num);
-   std::string max_car_count = std::to_string(*max_cars);
+void checkCarPosition( OD4Session *od4,
+   double *prev_centerX, double *prev_centerY, double centerX, double centerY,
+   bool *stop_line_arrived, vector<Point> &initial_car_positions) {
 
-   if (*max_cars < rect_num) {
-      *max_cars = rect_num; // remember the maximum amount of cars seen
+   double centerX_diff = centerX - *prev_centerX; // looks at whether or not car has moved
+   double centerY_diff = centerY - *prev_centerY;
+
+   int frame_center = 320;
+   int left_offset;
+   int right_offset;
+
+   if (*stop_line_arrived == false) {
+      left_offset = 110;
+      right_offset = 50;
    }
-   cout << "  [<    MAX CARS: " << max_car_count << "  >]";
-   if (rect_num == 0) {
-      // cout << "No cars. ";
+   if (*stop_line_arrived == true) {
+      left_offset = 320;
+      right_offset = 25;
    }
-   else if (rect_num == 1) {
-      cout << "           [<  " << car_count << " car. >]  " << endl;
-   } else {
-      cout << "           [<  " << car_count << " cars. >] " << endl;
+
+   cout << " [ center X: " << centerX << " ]   // " << " X diff - " << centerX_diff << endl;
+   cout << "  // [[center Y: " << centerY << " ]] // " << "Y diff - " << centerY_diff << endl;
+   if (centerX < frame_center - left_offset) {
+      if (initial_car_positions[0] == Point(0,0)) {
+         initial_car_positions[0] = Point((int) centerX, (int) centerY);
+         cout << "   <<<< ADDED LEFT CAR: " << initial_car_positions[0] << endl;
+      }
+      if (centerX_diff < 0 && centerY_diff > 0) {
+         if (*prev_centerX >= 50) {
+            cout << "Detected car on left side, probably car at 12 o clock." << endl;
+         }
+         else {
+            cout << "Detected car on left side, probably car at 3 o clock going out of sight" << endl;
+         }
+
+      }
+      // cout << "   << Car on left " << endl;
    }
-   putText(frame, car_count, Point(5,100), FONT_HERSHEY_DUPLEX, 1, Scalar(255,255,255), 2);
-   putText(frame, max_car_count, Point(630,100), FONT_HERSHEY_DUPLEX, 1, Scalar(255,255,255), 2);
+   if (centerX >= frame_center - left_offset && centerX < frame_center + right_offset) {
+      if (initial_car_positions[1] == Point(0,0)) {
+         initial_car_positions[1] = Point((int) centerX, (int) centerY);
+         cout << "   <<<< ADDED MIDDLE CAR: " << initial_car_positions[1] << endl;
+      }
+      if (centerX_diff < 0 && centerY_diff > 0) {
+         cout << "Detected car on middle, probably car at 12 o clock." << endl;
+      }
+      // cout << "   || Car in middle ||" << endl;
+   }
+   if (centerX > frame_center + right_offset) {
+      if (initial_car_positions[2] == Point(0,0)) {
+         initial_car_positions[2] = Point((int) centerX, (int) centerY);
+         cout << "   <<<< ADDED RIGHT CAR: " << initial_car_positions[2] << endl;
+      }
+      if (centerX_diff > 0 && centerY_diff > 0) {
+         cout << "Detected car on right side, probably car at 3 o clock." << endl;
+      }
+      // cout << "   Car on right >>" << endl;
+   }
+
+
+   // cout << " [[ area: " << area << " ]]";
+   // cout << " // Area diff: " << area_diff << " // ";
+   // if (area_diff < -100) { // If the car is moving away
+   //    cout << "Car moving away   " << endl;
+   // }
+   // if (area_diff >= -100 && area_diff < 100) {
+   //    cout << "car stationary " << endl;
+   // }
+   // if (area_diff >= 100) {
+   //    cout << " car coming closer   " << endl ;
+   // }
 }
 
 // https://answers.opencv.org/question/75510/how-to-make-auto-adjustmentsbrightness-and-contrast-for-image-android-opencv-image-correction/
@@ -462,7 +518,7 @@ void BrightnessAndContrastAuto(const cv::Mat &src, cv::Mat &dst, float clipHistP
         // cout << "clipHistPercent % : " << clipHistPercent << endl;
 
         clipHistPercent /= 2.0f; // left and right wings
-        cout << "clipHistPercent L/R wings : " << clipHistPercent << endl;
+        // cout << "clipHistPercent L/R wings : " << clipHistPercent << endl;
 
         // locate left cut
         minGray = 0;
@@ -476,14 +532,14 @@ void BrightnessAndContrastAuto(const cv::Mat &src, cv::Mat &dst, float clipHistP
            maxGray--;
         }
     }
-    cout << "Min:  " << minGray << "  ||  Max" << maxGray << "   || " << endl;
+    // cout << "Min:  " << minGray << "  ||  Max" << maxGray << "   || " << endl;
     // current range - inputrange is always 255.
     // maxgray is always 255. min gray is always 0.
     float inputRange = (float)maxGray - (float)minGray;
     // cout << "Input range: " << inputRange << endl;
     alpha = (histSize - 1) / inputRange;   // alpha expands current range to histsize range
     beta = (float)-minGray * (float)alpha; // beta shifts current range so that minGray will go to 0
-    cout << " Added Contrast: " << alpha << "   || " << " Added Brightness: " << beta << endl;
+    // cout << " Added Contrast: " << alpha << "   || " << " Added Brightness: " << beta << endl;
 
     // does the actual brightening.
     // Apply brightness and contrast normalization
