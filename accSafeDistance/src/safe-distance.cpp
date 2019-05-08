@@ -313,7 +313,7 @@ void checkCarDistance(double *prev_area, double area, double centerY, OD4Session
       float output = kp * error;
 
       // braking needs to be stronger than accelerating, need to modify correction to suit it.
-      if (output > 0) { correction_speed = output / 9000000; }
+      if (output > 0) { correction_speed = output / 8000000; }
       if (output <= 0) { correction_speed = output / 100000; }
 
    // braking needs to be faster than accelerating. I dont care.
@@ -342,7 +342,7 @@ void checkCarPosition(double centerX, OD4Session *od4) {
    float correction_angle;
    const float LOSTVISUAL = 1337;
 
-   if (centerX > LOSTVISUAL - 1) { // notify movecar
+   if (centerX > LOSTVISUAL - 1) { // notify movecar - compiler complains if its == 1337, so now its > 1336
       correction_angle = LOSTVISUAL; // Special code for visual lost
    }
    else {
