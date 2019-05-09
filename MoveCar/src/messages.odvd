@@ -428,4 +428,6 @@ message StopSignPresenceUpdate[id = 2010]{
    bool stopSignPresence [id = 1];
 }
 
+message CarOutOfSight[id = 2011]{
+}
 
