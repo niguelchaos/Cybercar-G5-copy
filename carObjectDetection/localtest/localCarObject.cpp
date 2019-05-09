@@ -28,11 +28,18 @@ using namespace cv;
 using namespace std;
 using namespace cluon;
 
-//Defining variables for stop sign
+
+void detectAndDisplayCars( Mat frame);
+
+//defining variables for stop sign
 String carsCascadeName;
 CascadeClassifier carsCascadeClassifier;
 
-void detectAndDisplayCars( Mat frame );
+bool carPresent = false;
+const int lookBackNoOfFrames = 20;
+int NO_OF_CARS_REQUIRED = 5;
+int currentIndex = 0;
+bool seenFrameCar[lookBackNoOfFrames] = {false};
 
 static void help(const char* programName)
 {
@@ -85,27 +92,68 @@ int main(int argc, char** argv) {
 }
 
 
-//Haar cascade for Stop sign copied and modified from
-//https://docs.opencv.org/3.4.1/db/d28/tutorial_cascade_classifier.html
-//Classifier gotten from : https://github.com/markgaynor/stopsigns
+bool insertCurrentFrameCar(bool carCurrentFrame) {
 
-void detectAndDisplayCars( Mat frame )
+        seenFrameCar[currentIndex] = carCurrentFrame;
+        currentIndex++;
+        if(currentIndex >= lookBackNoOfFrames) {
+            //Because we don't wanna go outside of the array.
+            currentIndex = 0;
+        }
+        
+        int noOfFramesWithCars = 0; 
+        //Loop over the array and collect all the trues.
+        for(int i = 0; i < lookBackNoOfFrames; i++) {
+            if(seenFrameCar[i]) {
+                noOfFramesWithCars++;
+            }
+        }
+        if(noOfFramesWithCars < NO_OF_CARS_REQUIRED) {
+            return false;
+        }
+        else {
+            return true;
+        }
+}
+
+//Haar cascade for cars copied and modified from
+//https://docs.opencv.org/3.4.1/db/d28/tutorial_cascade_classifier.html
+
+void detectAndDisplayCars( Mat frame, OD4Session *od4)
 {
+    //Sending messages for car detection
+    CarPresenceUpdate carPresenceUpdate;
+
     std::vector<Rect> cars;
     Mat frame_gray;
     cvtColor( frame, frame_gray, COLOR_BGR2GRAY );
     equalizeHist( frame_gray, frame_gray );
-    //-- Detect stop signs
-    carsCascadeClassifier.detectMultiScale( frame_gray, cars, 1.1, 2, 0|CASCADE_SCALE_IMAGE, Size(60, 60) );
-   for ( size_t i = 0; i < cars.size(); i++ )
-    {
-        Point center( cars[i].x + cars[i].width/2, cars[i].y + cars[i].height/2 );
-        //Draw a circle when recognized
-       ellipse( frame, center, Size( cars[i].width/2, cars[i].height/2 ), 0, 0, 360, Scalar( 255, 0, 255 ), 4, 8, 0 );
-       Mat faceROI = frame_gray( cars[i] );
-    }
-   // -- Opens a new window with the Stop sign recognition on
-   imshow( "cars", frame );
+    //-- Detect cars
+    carsCascadeClassifier.detectMultiScale(frame_gray, cars, 1.1, 2, 0|CASCADE_SCALE_IMAGE, Size(60, 60));
+    //checks if the car is present in the current frame
+    
+        float carArea = 0;
+        for (size_t i = 0; i < cars.size(); i++)
+        {
+            Point center( cars[i].x + cars[i].width/2, cars[i].y + cars[i].height/2 );
+            //Draw a circle when recognized
+            ellipse( frame, center, Size( cars[i].width/2, cars[i].height/2 ), 0, 0, 360, Scalar( 0, 0, 255 ), 4, 8, 0 );
+            Mat faceROI = frame_gray( cars[i] );
+            carArea += cars[i].width * cars[i].height;
+        }
 
+        //It compares the previous state with the current one and it reports it if there is a change of state
+            bool valueToReport = insertCurrentFrameCar(carArea > 200);
+            if(carPresent != valueToReport){
+                carPresent = valueToReport;
+                carPresenceUpdate.carPresence(valueToReport);
+                if(valueToReport) {
+                    std::cout << "Car detected " << std::endl;
+                } else {
+                    std::cout << "There are NO cars " << std::endl;
+                }
+                od4->send(carPresenceUpdate);
+            }
+    // -- Opens a new window with the car recognition on
+    imshow( "cars", frame );
 }
-
