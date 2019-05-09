@@ -30,7 +30,7 @@ using namespace cluon;
 
 float currentCarSpeed = 0.0;
 float currentSteering = 0.0;
-bool stopCarSent = false;
+//bool stopCarSent = false;
 
 std::chrono::time_point<std::chrono::system_clock> lastTimeZeroSpeed;
 float previousSpeed = 0.1; // set previous speed to 0.1 as a start condition so that MoveForward function can see the change of speed to zero
@@ -47,7 +47,7 @@ void SetSpeed(cluon::OD4Session& od4, float speed, bool VERBOSE)
 void StopCar(cluon::OD4Session& od4, bool VERBOSE)
 {
 	SetSpeed(od4, 0.0, VERBOSE);
-	// if (VERBOSE) { std::cout << "		[ Now stop ...] " << std::endl; }
+ 	 if (VERBOSE) { std::cout << "		[ Now stop ...] " << std::endl; }
 }
 
 void MoveForward(cluon::OD4Session& od4, float speed, bool VERBOSE)
@@ -154,7 +154,7 @@ int32_t main(int32_t argc, char **argv) {
 	//Bool message for stoping the car
    auto onStopCar{[&od4, VERBOSE](cluon::data::Envelope &&envelope)
             {
-		if (!stopCarSent) {
+		//if (!stopCarSent) {
 		auto msg = cluon::extractMessage<StopSignPresenceUpdate>(std::move(envelope));
 		bool stopSignPresence = msg.stopSignPresence(); // Get the bool
 
@@ -164,7 +164,7 @@ int32_t main(int32_t argc, char **argv) {
 			}
 
 			if (stopSignPresence==true){
-				stopCarSent = true;
+				//stopCarSent = true;
 				StopCar(od4, VERBOSE);
 			}
 
@@ -174,7 +174,7 @@ int32_t main(int32_t argc, char **argv) {
 			MoveForward (od4, 0.13, VERBOSE);
 			
 			}*/
-		}
+		//}
 	    }
         };
         od4.dataTrigger(StopSignPresenceUpdate::ID(), onStopCar);
