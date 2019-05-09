@@ -329,7 +329,7 @@ static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, vecto
       rectangle(image, boundRects[i].tl(), boundRects[i].br(), color, 2 );
    }
    groupRectangles(boundRects, group_thresh, merge_box_diff);  //group overlapping rectangles into 1
-   cout << "rectangles grouped/merged." << endl;
+   // cout << "rectangles grouped/merged." << endl;
    return image;
 }
 
@@ -410,14 +410,14 @@ void checkCarPosition( OD4Session *od4,
       right_offset = 25;
    }
 
-   cout << " [ center X: " << centerX << " ]   // " << " X diff - " << centerX_diff << endl;
-   cout << "  // [[center Y: " << centerY << " ]] // " << "Y diff - " << centerY_diff << endl;
+   cout << " [ center X: " << centerX << " ]   // " << " [ X diff: " << centerX_diff <<  " ] ";
+   cout << "       // [[center Y: " << centerY << " ]] // " << " [ Y diff: " << centerY_diff << " ] "<< endl;
    if (centerX < frame_center - left_offset) {
       if (initial_car_positions[0] == Point(0,0)) {
          initial_car_positions[0] = Point((int) centerX, (int) centerY);
          cout << "   <<<< ADDED LEFT CAR: " << initial_car_positions[0] << endl;
       }
-      if (centerX_diff < 0 && centerY_diff > 0) {
+      else if (centerX_diff < 0 && centerY_diff > 0) {
          if (*prev_centerX >= 50) {
             cout << "Detected car on left side, probably car at 12 o clock." << endl;
          }
@@ -433,7 +433,7 @@ void checkCarPosition( OD4Session *od4,
          initial_car_positions[1] = Point((int) centerX, (int) centerY);
          cout << "   <<<< ADDED MIDDLE CAR: " << initial_car_positions[1] << endl;
       }
-      if (centerX_diff < 0 && centerY_diff > 0) {
+      else if (centerX_diff < 0 && centerY_diff > 0) {
          cout << "Detected car on middle, probably car at 12 o clock." << endl;
       }
       // cout << "   || Car in middle ||" << endl;
@@ -443,7 +443,7 @@ void checkCarPosition( OD4Session *od4,
          initial_car_positions[2] = Point((int) centerX, (int) centerY);
          cout << "   <<<< ADDED RIGHT CAR: " << initial_car_positions[2] << endl;
       }
-      if (centerX_diff > 0 && centerY_diff > 0) {
+      else if (centerX_diff > 0 && centerY_diff > 0) {
          cout << "Detected car on right side, probably car at 3 o clock." << endl;
       }
       // cout << "   Car on right >>" << endl;
