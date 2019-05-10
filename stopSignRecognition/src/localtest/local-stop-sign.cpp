@@ -134,11 +134,12 @@ void detectAndDisplayStopSign( Mat frame)
             //Draw a circle when recognized
             ellipse( frame, center, Size( stopsigns[i].width/2, stopsigns[i].height/2 ), 0, 0, 360, Scalar( 0, 0, 255 ), 4, 8, 0 );
             Mat faceROI = frame_gray( stopsigns[i] );
-            stopSignArea += stopsigns[i].width * stopsigns[i].height;
+            stopSignArea = stopsigns[i].width * stopsigns[i].height;
+            std::cout << " << stopSignArea: " << stopSignArea << " >> " << std::endl;
         }
 
         //It compares the previous state with the current one and it reports it if there is a change of state
-            bool valueToReport = insertCurrentFrameStopSign(stopSignArea > 200);
+            bool valueToReport = insertCurrentFrameStopSign(stopSignArea > 8000);
             if(stopSignPresent != valueToReport){
                 stopSignPresent = valueToReport;
                 stopSignPresenceUpdate.stopSignPresence(valueToReport);
@@ -146,11 +147,11 @@ void detectAndDisplayStopSign( Mat frame)
                     std::cout << "you are currectly seeing a STOP sign " << std::endl;
                 } else {
                     std::cout << "STOP SIGN GONE, STOP NOW!!!!!!!!!!!!!!!!!!!!!!!!!!!!! " << std::endl;
-                    od4->send(stopSignPresenceUpdate);
+                   // od4->send(stopSignPresenceUpdate);
                 }
             }else {
-                    std::cout << "There is NO stop sign yet " << std::endl;
+                   // std::cout << "There is NO stop sign yet " << std::endl;
             }
-    // -- Opens a new window with the Stop sign recognition on
+    // -- Opens a new window with the Stop sign recognition on.
     imshow( "stopSign", frame );
 }

@@ -166,10 +166,10 @@ bool insertCurrentFrameStopSign(bool stopSignCurrentFrame) {
             }
         }
         if(noOfFramesWithStopsigns < NO_OF_STOPSIGNS_REQUIRED) {
-            return false;
+            return true;
         }
         else {
-            return true;
+            return false;
         }
 }
 
@@ -196,11 +196,12 @@ void detectAndDisplayStopSign( Mat frame, OD4Session *od4)
             //Draw a circle when recognized
             ellipse( frame, center, Size( stopsigns[i].width/2, stopsigns[i].height/2 ), 0, 0, 360, Scalar( 0, 0, 255 ), 4, 8, 0 );
             Mat faceROI = frame_gray( stopsigns[i] );
-            stopSignArea += stopsigns[i].width * stopsigns[i].height;
+            stopSignArea = stopsigns[i].width * stopsigns[i].height;
+            //std::cout << " << stopSignArea: " << stopSignArea << " >> " << std::endl;
         }
 
         //It compares the previous state with the current one and it reports it if there is a change of state
-            bool valueToReport = insertCurrentFrameStopSign(stopSignArea > 200);
+            bool valueToReport = insertCurrentFrameStopSign(stopSignArea > 8000);
             if(stopSignPresent != valueToReport){
                 stopSignPresent = valueToReport;
                 stopSignPresenceUpdate.stopSignPresence(valueToReport);
