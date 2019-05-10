@@ -287,7 +287,7 @@ void BrightnessAndContrastAuto(const cv::Mat &src, cv::Mat &dst, float clipHistP
     else if (src.type() == CV_8UC3) cvtColor(src, gray, COLOR_BGR2GRAY);
     else if (src.type() == CV_8UC4) cvtColor(src, gray, COLOR_BGRA2GRAY);
 
-    imshow("before brighten", gray);
+    // imshow("before brighten", gray);
     if (clipHistPercent == 0)
     {
         // keep full available range
@@ -311,14 +311,14 @@ void BrightnessAndContrastAuto(const cv::Mat &src, cv::Mat &dst, float clipHistP
         for (int i = 1; i < histSize; i++) // 1 - 255
         {
             accumulator[i] = accumulator[i - 1] + hist.at<float>(i);
-            cout << "accumulator [" << i << "]: " << accumulator[i] << endl;
+            // cout << "accumulator [" << i << "]: " << accumulator[i] << endl;
         }
 
         // locate points that cuts at required value
         float max = accumulator.back();
         clipHistPercent *= (max / 100.0); //make percent as absolute
         cout << "clipHistPercent % : " << clipHistPercent << endl;
-        clipHistPercent /= 2.0; // left and right wings
+        clipHistPercent /= 2.0f; // left and right wings
         cout << "clipHistPercent L/R wings : " << clipHistPercent << endl;
         // locate left cut
         minGray = 0;
@@ -344,7 +344,7 @@ void BrightnessAndContrastAuto(const cv::Mat &src, cv::Mat &dst, float clipHistP
     // convertTo operates with saturate_cast
 
     src.convertTo(dst, -1, alpha, beta);
-   imshow("after brighten", dst);
+   // imshow("after brighten", dst);
 
     // restore alpha channel from source
     if (dst.type() == CV_8UC4)
@@ -503,11 +503,11 @@ int main(int argc, char** argv) {
 
 
       // show image with the tracked object
-      imshow("PinkOrig", finalFramePink);
+      // imshow("PinkOrig", finalFramePink);
       imshow("Original", frame);
       // imshow("Yellow", finalFrameYellow);
       // imshow ("Sat Pink", finalSatFramePink);
-      // imshow("brightened boiiii", final_clahe_frame);
+      imshow("brightened boiiii", brightened_frame);
 
       // // show image with the tracked object
       // imshow("tracker",frame);

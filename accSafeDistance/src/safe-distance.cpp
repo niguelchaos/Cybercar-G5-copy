@@ -302,7 +302,7 @@ void checkCarDistance(double *prev_area, double area, double centerY, OD4Session
       if (area_diff >= brake_area_diff_thresh) {
          // make optimal area farther(smaller) if the car has accelerated a lot to brake earlier and harder.
          // small differences dont make much of a difference - deals with large variations of area
-         optimal_area = optimal_area - (area_diff * 1.7f);
+         optimal_area = optimal_area - (area_diff * 1.5f);
       }
       cout << endl << "         // Area diff: " << area_diff << "//    ";
       cout << "New Opt Area: " << optimal_area << "//" << endl;
@@ -313,14 +313,14 @@ void checkCarDistance(double *prev_area, double area, double centerY, OD4Session
       float output = kp * error;
 
       // braking needs to be stronger than accelerating, need to modify correction to suit it.
-      if (output > 0) { correction_speed = output / 8000000; }
+      if (output > 0) { correction_speed = output / 7500000; }
       if (output <= 0) { correction_speed = output / 100000; }
 
    // braking needs to be faster than accelerating. I dont care.
       if (correction_speed <= 0) { correction_speed = correction_speed * 5; } // hard multiplier by 5
 
-   // If the car in front has somewhat been maintaining the distance
-      if (area_diff >= accel_area_diff_thresh && area_diff < brake_area_diff_thresh) {
+   // If the car in front has somewhat been maintaining the distance and area > 5000 (close enough)
+      if (error > 0 && error < 3000 && area_diff >= accel_area_diff_thresh && area_diff < brake_area_diff_thresh) {
          correction_speed = DECELERATE;
       }
 
@@ -470,7 +470,7 @@ void BrightnessAndContrastAuto(const cv::Mat &src, cv::Mat &dst, float clipHistP
         clipHistPercent *= (max / 100.0f); //make percent as absolute
         // cout << "clipHistPercent % : " << clipHistPercent << endl;
 
-        clipHistPercent /= 2.0f; // left and right wings
+        clipHistPercent /= 4.5f; // left and right wings
         cout << "clipHistPercent L/R wings : " << clipHistPercent << endl;
 
         // locate left cut

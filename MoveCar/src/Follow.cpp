@@ -97,7 +97,7 @@ int32_t main(int32_t argc, char **argv) {
 		}
 
 	   const bool VERBOSE{commandlineArguments.count("verbose") != 0};
-		const float STARTSPEED{(commandlineArguments["startspeed"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["startspeed"])) : static_cast<float>(0.102)};
+		const float STARTSPEED{(commandlineArguments["startspeed"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["startspeed"])) : static_cast<float>(0.109)};
 		const float MAXSPEED{(commandlineArguments["maxspeed"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["maxspeed"])) : static_cast<float>(0.12)};
 
 		const float MAXSTEER{(commandlineArguments["maxsteer"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["maxsteer"])) : static_cast<float>(0.4)};
@@ -211,8 +211,8 @@ int32_t main(int32_t argc, char **argv) {
 					}
 				}
 				if (amount == DECELERATE) {
-					if (currentCarSpeed > STARTSPEED + 0.004) { // only begin decelerating if the car is too fast. Give the car some time to get some speed.
-						currentCarSpeed += -0.0008;
+					if (currentCarSpeed > STARTSPEED + 0.005) { // only begin decelerating if the car is too fast. Give the car some time to get some speed.
+						currentCarSpeed += -0.0005;
 						if (currentCarSpeed < STARTSPEED){ currentCarSpeed = 0; } // should not enter here, but if it does, here is backup.
 						cout << "Maintaining Distance, decelerating" << endl;
 					}
