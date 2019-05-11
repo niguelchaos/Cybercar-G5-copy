@@ -308,6 +308,8 @@ void BrightnessAndContrastAuto(const cv::Mat &src, cv::Mat &dst, float clipHistP
         // calculate cumulative distribution from the histogram
         std::vector<float> accumulator(histSize);
         accumulator[0] = hist.at<float>(0);
+        cout << "accumulator [0]: " << accumulator[0];
+
         for (int i = 1; i < histSize; i++) // 1 - 255
         {
             accumulator[i] = accumulator[i - 1] + hist.at<float>(i);
@@ -316,8 +318,10 @@ void BrightnessAndContrastAuto(const cv::Mat &src, cv::Mat &dst, float clipHistP
 
         // locate points that cuts at required value
         float max = accumulator.back();
+        cout << "      accumulator max: " << max << endl;
+
         clipHistPercent *= (max / 100.0); //make percent as absolute
-        cout << "clipHistPercent % : " << clipHistPercent << endl;
+        // cout << "clipHistPercent % : " << clipHistPercent << endl;
         clipHistPercent /= 2.0f; // left and right wings
         cout << "clipHistPercent L/R wings : " << clipHistPercent << endl;
         // locate left cut
