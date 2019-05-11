@@ -111,11 +111,8 @@ int32_t main(int32_t argc, char **argv) {
             Mat brightened_frame;
 
             Mat frame_threshold_pink;
-            Mat frame_threshold_green;
             Mat finalFramePink;
-            Mat finalFrameGreen;
             vector<vector<Point> > pinkSquares;
-            vector<vector<Point> > greenSquares;
 
             const int max_value_H = 360/2;
             const int max_value = 255;
@@ -143,8 +140,8 @@ int32_t main(int32_t argc, char **argv) {
 
          // Pink
             int low_H_pink = 135;
-            int low_S_pink = 50;
-            int low_V_pink = 50;
+            int low_S_pink = 69;
+            int low_V_pink = 69;
             int high_H_pink = max_value_H;
             int high_S_pink = max_value;
             int high_V_pink = max_value;
@@ -152,12 +149,10 @@ int32_t main(int32_t argc, char **argv) {
             // Crop the frame to get useful stuff
             frame(Rect(Point(0, 0), Point(640, 370))).copyTo(cropped_frame);
 
-            // auto brighten src needs to either be in gray or BGR
-            cvtColor(cropped_frame, cropped_frame_BGR, COLOR_RGB2BGR);
             // Automatically increase the brightness and contrast of the video.
-            BrightnessAndContrastAuto(cropped_frame_BGR, brightened_frame, 0.7f);
+            BrightnessAndContrastAuto(cropped_frame, brightened_frame, 0.6f);
             // Convert from BGR to HSV colorspace
-            cvtColor(brightened_frame, frame_HSV, COLOR_BGR2HSV);
+            cvtColor(brightened_frame, frame_HSV, COLOR_RGB2HSV);
             // Detect the object based on HSV Range Values
             inRange(frame_HSV, Scalar(low_H_pink, low_S_pink, low_V_pink), Scalar(high_H_pink, high_S_pink, high_V_pink), frame_threshold_pink);
 
@@ -166,11 +161,11 @@ int32_t main(int32_t argc, char **argv) {
 
              // Display image. For testing recordings only.
             if (VERBOSE) {
-               // imshow("Pink", finalFramePink);
+               imshow("Pink", finalFramePink);
                // // imshow("Green", finalFrameGreen);
-               // imshow("original frame", cropped_frame);
-               // imshow("brightened bois", brightened_frame);
-               // cv::waitKey(1);
+               imshow("original frame", cropped_frame);
+               imshow("brightened bois", brightened_frame);
+               cv::waitKey(1);
             }
 
             // measures FPS
@@ -434,8 +429,9 @@ void BrightnessAndContrastAuto(const cv::Mat &src, cv::Mat &dst, float clipHistP
     //to calculate grayscale histogram
     cv::Mat gray;
     if (src.type() == CV_8UC1) gray = src;
-    else if (src.type() == CV_8UC3) cvtColor(src, gray, COLOR_BGR2GRAY);
-    else if (src.type() == CV_8UC4) cvtColor(src, gray, COLOR_BGRA2GRAY);
+    // modified from BGR to RGB
+    else if (src.type() == CV_8UC3) cvtColor(src, gray, COLOR_RGB2GRAY);
+    else if (src.type() == CV_8UC4) cvtColor(src, gray, COLOR_RGBA2GRAY);
     if (clipHistPercent <= 0)
     {
         // keep full available range
@@ -456,7 +452,7 @@ void BrightnessAndContrastAuto(const cv::Mat &src, cv::Mat &dst, float clipHistP
         // calculate cumulative distribution from the histogram
         std::vector<float> accumulator(histSize);
         accumulator[0] = hist.at<float>(0);
-        // cout << "accumulator [0]: " << accumulator[0] << endl;
+        // cout << "accumulator [0]: " << accumulator[0];
 
 
         for (int i = 1; i < histSize; i++)
@@ -466,12 +462,26 @@ void BrightnessAndContrastAuto(const cv::Mat &src, cv::Mat &dst, float clipHistP
 
         // locate points that cuts at required value
         float max = accumulator.back(); // last element of the array
-         // cout << "accumulator max: " << max << endl;
+         // cout << "      accumulator max: " << max << endl;
         clipHistPercent *= (max / 100.0f); //make percent as absolute
         // cout << "clipHistPercent % : " << clipHistPercent << endl;
 
-        clipHistPercent /= 4.5f; // left and right wings
+        clipHistPercent /= 2.1f; // left and right wings
         cout << "clipHistPercent L/R wings : " << clipHistPercent << endl;
+
+        accumulator[0] = 0;
+
+// as the picamera seems to have a lower...color range than the algorithm,
+// a hardcoded little boost of brightness and contrast is given
+// by artificially bumping/lowering the values of both the upper and lower ends of the histogram
+        for (int a = 1; a < histSize/9; a++) {
+            accumulator[a] = (accumulator[a - 1] + hist.at<float>(a)) / 2;
+            // cout << "accumulator ["<< a << "]: " << accumulator[a] << endl;
+        }
+        for (int i = histSize - 1; i > histSize - histSize/8 ; i--) {
+            accumulator[i] = (accumulator[i - 1] + hist.at<float>(i)) * 2;
+            // cout << "accumulator ["<< i << "]: " << accumulator[i] << endl;
+        }
 
         // locate left cut
         minGray = 0;
