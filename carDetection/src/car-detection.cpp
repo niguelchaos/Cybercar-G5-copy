@@ -60,12 +60,13 @@ static void findSquares( const Mat& image, vector<vector<Point> >& squares );
 static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, vector<Rect> &boundRects, OD4Session *od4);
 
 void checkCarPosition(OD4Session *od4, double *prev_centerX, double *prev_centerY, double centerX, double centerY,
-   bool *stop_line_arrived, vector<Point> &initial_car_positions);
-void countCars(Mat frame, vector<Rect>& rects, int *cars_in_queue);
+   double *prev_area, double area, bool *stop_line_arrived,
+   vector<Point> &initial_car_positions, int *cars_in_queue, int *car_leave_timeout_counter);
+void countCars(Mat frame, vector<Point> &initial_car_positions , int *cars_in_queue);
 void detectCars(
    OD4Session *od4, Mat& image, const vector<vector<Point> >& squares, vector<Rect> &boundRects,
    double *prev_area, double *prev_centerX, double *prev_centerY,
-   int *cars_in_queue, bool *stop_line_arrived, vector<Point> &initial_car_positions);
+   int *cars_in_queue, int *car_leave_timeout_counter, bool *stop_line_arrived, vector<Point> &initial_car_positions);
 void BrightnessAndContrastAuto(const cv::Mat &src, cv::Mat &dst, float clipHistPercent);
 
 int32_t main(int32_t argc, char **argv) {
@@ -105,12 +106,12 @@ int32_t main(int32_t argc, char **argv) {
          int64_t prevtimestampsecs = 0;
          int framecounter = 0;
 
-
          double prev_area = 0; // used to determine whether car is moving and amount of acceleration
          double prev_centerX = 0; // used to track cars
          double prev_centerY = 0;
 
          int cars_in_queue = 0; // keeps track of the highest amount of cars
+         int car_leave_timeout_counter = 0; // prevents counting 1 car leaving as 2
          vector<Point> initial_car_positions {Point(0,0), Point(0,0), Point(0,0)}; // { left | mid | right } respectively
 
          bool stop_line_arrived = false;
@@ -180,11 +181,11 @@ int32_t main(int32_t argc, char **argv) {
 
             // auto brighten needs to be in BGR
             // RGB > BGR (brighten frame) > HSV (detect colors)
-            cvtColor(cropped_frame, brightened_frame, COLOR_RGB2BGR);
+            // cvtColor(cropped_frame, brightened_frame, COLOR_RGB2BGR);
             // Automatically increase the brightness and contrast of the video.
-            BrightnessAndContrastAuto(brightened_frame, brightened_frame, 0.7f);
+            BrightnessAndContrastAuto(cropped_frame, brightened_frame, 0.6f);
             // Convert from BGR to HSV colorspace
-            cvtColor(brightened_frame, frame_HSV, COLOR_BGR2HSV);
+            cvtColor(brightened_frame, frame_HSV, COLOR_RGB2HSV);
             // Detect the object based on HSV Range Values
             inRange(frame_HSV, Scalar(low_H_pink, low_S_pink, low_V_pink), Scalar(high_H_pink, high_S_pink, high_V_pink), frame_threshold);
 
@@ -192,7 +193,8 @@ int32_t main(int32_t argc, char **argv) {
             final_frame = drawSquares(frame_threshold, squares, boundRects, &od4);
 
             detectCars(&od4, final_frame, squares, boundRects, &prev_area, &prev_centerX, &prev_centerY,
-               &cars_in_queue, &stop_line_arrived, initial_car_positions);
+               &cars_in_queue, &car_leave_timeout_counter, &stop_line_arrived, initial_car_positions);
+
             // notify movecar when it is time to go
             if (stop_line_arrived == true && cars_in_queue == 0) {
                TimeToYeetOutOfIntersection yeet;
@@ -201,15 +203,21 @@ int32_t main(int32_t argc, char **argv) {
             }
              // Display image. For testing recordings only.
             if (VERBOSE) {
-               // imshow("Pink", final_frame);
-               // imshow("original frame", cropped_frame);
-               // imshow("brightened bois", brightened_frame);
-               // cv::waitKey(1);
+               imshow("Detected cars", final_frame);
+               imshow("original frame", cropped_frame);
+               imshow("brightened bois", brightened_frame);
+               cv::waitKey(1);
             }
 
             // measures FPS
             framecounter++;
             if (timestampsecs != prevtimestampsecs) {
+               if (car_leave_timeout_counter > 0) {
+                  car_leave_timeout_counter -= 1;
+                  if (car_leave_timeout_counter == 0) {
+                     cout << "                   [ READY TO DETECT LEAVING CARS ]" << endl;
+                  }
+               }
                cout << endl << "Timestamp: " << timestampsecs << "          FPS: " << framecounter << endl;
                prevtimestampsecs = timestampsecs;
                framecounter = 0;
@@ -290,7 +298,7 @@ static void findSquares( const Mat& image, vector<vector<Point> >& squares ) {
             // contour orientation
 
             if( approx.size() == 4 && // if there are 4 sides...
-            fabs(contourArea(approx)) > 1000 && // and the square is big enough...
+            fabs(contourArea(approx)) > 700 && // and the square is big enough...
             fabs(contourArea(approx)) < 200000 &&
             isContourConvex(approx) ) { // and square is convex...
 
@@ -333,20 +341,32 @@ static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, vecto
    return image;
 }
 
-void countCars(Mat frame, vector<Rect>& rects, int *cars_in_queue) {
-   int rect_num =  rects.size();
-   std::string car_count = std::to_string(rect_num);
+void countCars(Mat frame, vector<Point> &initial_car_positions, int *cars_in_queue) {
+   int car_num = 0;
+   if (initial_car_positions[0] != Point(0,0)) {
+      car_num += 1;
+      cout << endl << " <<<< ";
+   }
+   if (initial_car_positions[1] != Point(0,0)) {
+      car_num += 1;
+      cout  << " |||| ";
+   }
+   if (initial_car_positions[2] != Point(0,0)) {
+      car_num += 1;
+      cout << " >>>> " << endl;
+   }
+   std::string car_count = std::to_string(car_num);
    std::string max_car_count = std::to_string(*cars_in_queue);
 
-   if (*cars_in_queue < rect_num) {
-      *cars_in_queue = rect_num; // remember the maximum amount of cars seen
+   if (*cars_in_queue < car_num) {
+      *cars_in_queue = car_num; // remember the maximum amount of cars seen
    }
 
-   cout << "  [<    MAX CARS: " << max_car_count << "  >]";
-   if (rect_num == 0) {
+   cout << "  [<    CARS IN QUEUE : " << max_car_count << "  >]" << endl ;
+   if (car_num == 0) {
       // cout << "No cars. ";
    }
-   else if (rect_num == 1) {
+   else if (car_num == 1) {
       cout << "           [<  " << car_count << " car. >]  " << endl;
    } else {
       cout << "           [<  " << car_count << " cars. >] " << endl;
@@ -358,7 +378,7 @@ void countCars(Mat frame, vector<Rect>& rects, int *cars_in_queue) {
 void detectCars(
    OD4Session *od4, Mat& image, const vector<vector<Point> >& squares, vector<Rect> &boundRects,
    double *prev_area, double *prev_centerX, double *prev_centerY,
-   int *cars_in_queue, bool *stop_line_arrived, vector<Point> &initial_car_positions) {
+   int *cars_in_queue, int *car_leave_timeout_counter, bool *stop_line_arrived, vector<Point> &initial_car_positions) {
 
    double rect_area = 0;
    double rect_centerX = 0; // valid range from 0 - 640
@@ -380,10 +400,15 @@ void detectCars(
       Point bot_left(rect_x, rect_y + rect_height);
       Point bot_right(rect_x + rect_width, rect_y + rect_height);
 
+      checkCarPosition(
+         od4, prev_centerX, prev_centerY, rect_centerX, rect_centerY,
+         prev_area, rect_area,
+         stop_line_arrived, initial_car_positions, cars_in_queue, car_leave_timeout_counter);
+
       if (*stop_line_arrived == false) {
-         countCars(image, boundRects, cars_in_queue);
+         countCars(image, initial_car_positions, cars_in_queue);
       }
-      checkCarPosition( od4, prev_centerX, prev_centerY, rect_centerX, rect_centerY, stop_line_arrived, initial_car_positions);
+
       *prev_area = rect_area; // remember this frame's area for the next frame
       *prev_centerX = rect_centerX;
       *prev_centerY = rect_centerY;
@@ -392,7 +417,8 @@ void detectCars(
 
 void checkCarPosition( OD4Session *od4,
    double *prev_centerX, double *prev_centerY, double centerX, double centerY,
-   bool *stop_line_arrived, vector<Point> &initial_car_positions) {
+   double *prev_area, double area, bool *stop_line_arrived,
+   vector<Point> &initial_car_positions, int *cars_in_queue, int *car_leave_timeout_counter) {
 
    double centerX_diff = centerX - *prev_centerX; // looks at whether or not car has moved
    double centerY_diff = centerY - *prev_centerY;
@@ -402,7 +428,7 @@ void checkCarPosition( OD4Session *od4,
    int right_offset;
 
    if (*stop_line_arrived == false) {
-      left_offset = 110;
+      left_offset = 220;
       right_offset = 50;
    }
    if (*stop_line_arrived == true) {
@@ -410,45 +436,105 @@ void checkCarPosition( OD4Session *od4,
       right_offset = 25;
    }
 
-   cout << " [ center X: " << centerX << " ]   // " << " [ X diff: " << centerX_diff <<  " ] ";
-   cout << "       // [[center Y: " << centerY << " ]] // " << " [ Y diff: " << centerY_diff << " ] "<< endl;
-   if (centerX < frame_center - left_offset) {
-      if (initial_car_positions[0] == Point(0,0)) {
-         initial_car_positions[0] = Point((int) centerX, (int) centerY);
-         cout << "   <<<< ADDED LEFT CAR: " << initial_car_positions[0] << endl;
-      }
-      else if (centerX_diff < 0 && centerY_diff > 0) {
-         if (*prev_centerX >= 50) {
-            cout << "Detected car on left side, probably car at 12 o clock." << endl;
+   switch (*stop_line_arrived) {
+      case false:
+
+      cout << " [ center X: " << centerX << " ]   // " << " [ X diff: " << centerX_diff <<  " ] ";
+      cout << " // [[center Y: " << centerY << " ]] // " << " [ Y diff: " << centerY_diff << " ] "<< endl;
+
+      if (centerX < frame_center - left_offset) {
+         if (initial_car_positions[0] == Point(0,0)) {
+            initial_car_positions[0] = Point((int) centerX, (int) centerY);
+            cout << "   <<<< ADDED LEFT CAR: " << initial_car_positions[0] << endl;
          }
-         else {
-            cout << "Detected car on left side, probably car at 3 o clock going out of sight" << endl;
+         else if (centerX_diff > -200 && centerX_diff < 0 && centerY_diff > 0) {
+            if (*prev_centerX >= 50) {
+               cout << "Detected car on left side, probably car at 12 o clock. Also probably close to stop line." << endl;
+               *stop_line_arrived = true;
+            }
+            else {
+               cout << "Detected car on left side, probably car at 3 o clock going out of sight" << endl;
+            }
+         }
+      }
+
+      if (centerX >= frame_center - left_offset && centerX < frame_center + right_offset) {
+         if (initial_car_positions[1] == Point(0,0)) {
+            initial_car_positions[1] = Point((int) centerX, (int) centerY);
+            cout << "   |||| ADDED MIDDLE CAR: " << initial_car_positions[1] << endl;
+         }
+         else if (centerX_diff < 0 && centerY_diff > 0) {
+            cout << "Detected car on middle, probably car at 12 o clock." << endl;
+         }
+      }
+
+      if (centerX > frame_center + right_offset) {
+         if (initial_car_positions[2] == Point(0,0)) {
+            initial_car_positions[2] = Point((int) centerX, (int) centerY);
+            cout << "   >>>> ADDED RIGHT CAR: " << initial_car_positions[2] << endl;
+         }
+         else if (centerX_diff > 0 && centerY_diff > 0) {
+            cout << "Detected car on right side, probably car at 3 o clock." << endl;
+         }
+      }
+      break;
+
+      case true:
+      // cout << "At Stop Line" << endl;
+      cout << " [ center X: " << centerX << " ]   // " << " [ X diff: " << centerX_diff <<  " ] ";
+      cout << " // [[center Y: " << centerY << " ]] // " << " [ Y diff: " << centerY_diff << " ] "<< endl;
+
+      // car is on middle/left - camera too close to see left
+      if (centerX >= frame_center - left_offset && centerX < frame_center + right_offset) {
+
+         if (centerX_diff < 0 && centerY_diff > 0) {
+            if (area > 3500) {
+               cout << "   / Car leaving Intersection, towards our lane. /" << endl;
+               if (centerX < 40 && centerY > 180) {
+                  cout << " /// Car has left intersection on our lane. ///" << endl;
+                  *cars_in_queue -= 1;
+                  *car_leave_timeout_counter = 5; // new car must wait 5 seconds before leaving
+                  cout << "            [ TIMEOUT ON ] " << *car_leave_timeout_counter << endl;
+               }
+            }
          }
 
-      }
-      // cout << "   << Car on left " << endl;
-   }
-   if (centerX >= frame_center - left_offset && centerX < frame_center + right_offset) {
-      if (initial_car_positions[1] == Point(0,0)) {
-         initial_car_positions[1] = Point((int) centerX, (int) centerY);
-         cout << "   <<<< ADDED MIDDLE CAR: " << initial_car_positions[1] << endl;
-      }
-      else if (centerX_diff < 0 && centerY_diff > 0) {
-         cout << "Detected car on middle, probably car at 12 o clock." << endl;
-      }
-      // cout << "   || Car in middle ||" << endl;
-   }
-   if (centerX > frame_center + right_offset) {
-      if (initial_car_positions[2] == Point(0,0)) {
-         initial_car_positions[2] = Point((int) centerX, (int) centerY);
-         cout << "   <<<< ADDED RIGHT CAR: " << initial_car_positions[2] << endl;
-      }
-      else if (centerX_diff > 0 && centerY_diff > 0) {
-         cout << "Detected car on right side, probably car at 3 o clock." << endl;
-      }
-      // cout << "   Car on right >>" << endl;
-   }
+         else if (centerY_diff < 0) {
+            cout << "   | Car leaving Intersection, towards 12 o clock. | " << endl;
+            if (area < 3500) {
+               cout << "    || Car has left intersection at 12 o clock. || " << endl;
+               *cars_in_queue -= 1;
+               *car_leave_timeout_counter = 5;
+               cout << "            [ TIMEOUT ON ] " << *car_leave_timeout_counter << endl;
+            }
+         }
 
+         else if (centerX_diff < 0 ) {
+            cout << "   < Car leaving Intersection, towards 9 o clock. < " << endl;
+            if (centerX < 40 && centerY < 180) {
+               cout << "   <<< Car has left Intersection, towards 9 o clock. <<< " << endl;
+               *cars_in_queue -= 1;
+               *car_leave_timeout_counter = 5;
+               cout << "            [ TIMEOUT ON ] " << *car_leave_timeout_counter << endl;
+            }
+         }
+      }
+
+      if (centerX > frame_center + right_offset) {
+
+         if (centerX_diff > 0) {
+            cout << "    > Car leaving Intersection towards 3 o clock >" << endl;
+            if (centerX > 600) {
+               cout << "   >> Car has left at 3 o clock >> " << endl;
+               *cars_in_queue -= 1;
+               *car_leave_timeout_counter = 5;
+               cout << "            [ TIMEOUT ON ] " << *car_leave_timeout_counter << endl;
+            }
+         }
+      }
+      break;
+
+   }
 
    // cout << " [[ area: " << area << " ]]";
    // cout << " // Area diff: " << area_diff << " // ";
@@ -481,8 +567,8 @@ void BrightnessAndContrastAuto(const cv::Mat &src, cv::Mat &dst, float clipHistP
     //to calculate grayscale histogram
     cv::Mat gray;
     if (src.type() == CV_8UC1) gray = src;
-    else if (src.type() == CV_8UC3) cvtColor(src, gray, COLOR_BGR2GRAY);
-    else if (src.type() == CV_8UC4) cvtColor(src, gray, COLOR_BGRA2GRAY);
+    else if (src.type() == CV_8UC3) cvtColor(src, gray, COLOR_RGB2GRAY);
+    else if (src.type() == CV_8UC4) cvtColor(src, gray, COLOR_RGBA2GRAY);
     if (clipHistPercent <= 0)
     {
         // keep full available range
@@ -517,7 +603,7 @@ void BrightnessAndContrastAuto(const cv::Mat &src, cv::Mat &dst, float clipHistP
         clipHistPercent *= (max / 100.0f); //make percent as absolute
         // cout << "clipHistPercent % : " << clipHistPercent << endl;
 
-        clipHistPercent /= 2.0f; // left and right wings
+        clipHistPercent /= 1.2f; // left and right wings
         // cout << "clipHistPercent L/R wings : " << clipHistPercent << endl;
 
         // locate left cut
