@@ -34,7 +34,7 @@ CascadeClassifier stopSignCascade;
 
 
 bool stopSignPresent = false;
-const int lookBackNoOfFrames = 20;
+const int lookBackNoOfFrames = 7;
 int NO_OF_STOPSIGNS_REQUIRED = 5;
 int currentIndex = 0;
 bool seenFrameStopsigns[lookBackNoOfFrames] = {false};
