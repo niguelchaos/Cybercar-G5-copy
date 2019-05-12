@@ -51,7 +51,7 @@ void detectAndDisplayStopSign( Mat frame, OD4Session *od4);
 String stopSignCascadeName;
 CascadeClassifier stopSignCascade;
 bool stopSignPresent = false;
-const int lookBackNoOfFrames = 20;
+const int lookBackNoOfFrames = 6;
 int NO_OF_STOPSIGNS_REQUIRED = 5;
 int currentIndex = 0;
 bool seenFrameStopsigns[lookBackNoOfFrames] = {false};
@@ -166,10 +166,10 @@ bool insertCurrentFrameStopSign(bool stopSignCurrentFrame) {
             }
         }
         if(noOfFramesWithStopsigns < NO_OF_STOPSIGNS_REQUIRED) {
-            return true;
+            return false;
         }
         else {
-            return false;
+            return true;
         }
 }
 
