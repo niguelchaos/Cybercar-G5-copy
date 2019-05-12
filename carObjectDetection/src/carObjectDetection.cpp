@@ -204,7 +204,7 @@ void detectAndDisplayCars( Mat frame, OD4Session *od4)
         }
 
         //It compares the previous state with the current one and it reports it if there is a change of state
-            bool valueToReport = insertCurrentFrameCar(carArea > 200);
+            bool valueToReport = insertCurrentFrameCar(carArea > 8000);
             if(carPresent != valueToReport){
                 carPresent = valueToReport;
                 carPresenceUpdate.carPresence(valueToReport);

@@ -119,7 +119,7 @@ bool insertCurrentFrameCar(bool carCurrentFrame) {
 //Haar cascade for cars copied and modified from
 //https://docs.opencv.org/3.4.1/db/d28/tutorial_cascade_classifier.html
 
-void detectAndDisplayCars( Mat frame, OD4Session *od4)
+void detectAndDisplayCars( Mat frame)
 {
     //Sending messages for car detection
     CarPresenceUpdate carPresenceUpdate;
@@ -152,7 +152,7 @@ void detectAndDisplayCars( Mat frame, OD4Session *od4)
                 } else {
                     std::cout << "There are NO cars " << std::endl;
                 }
-                od4->send(carPresenceUpdate);
+                //od4->send(carPresenceUpdate);
             }
     // -- Opens a new window with the car recognition on
     imshow( "cars", frame );
