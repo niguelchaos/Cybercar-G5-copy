@@ -107,7 +107,7 @@ int32_t main(int32_t argc, char **argv) {
             Mat frame_HSV;
             Mat frame_gray;
             Mat cropped_frame;
-            Mat cropped_frame_BGR;
+            // Mat cropped_frame_BGR;
             Mat brightened_frame;
 
             Mat frame_threshold_pink;
@@ -141,7 +141,7 @@ int32_t main(int32_t argc, char **argv) {
          // Pink
             int low_H_pink = 135;
             int low_S_pink = 69;
-            int low_V_pink = 69;
+            int low_V_pink = 59;
             int high_H_pink = max_value_H;
             int high_S_pink = max_value;
             int high_V_pink = max_value;
@@ -149,10 +149,17 @@ int32_t main(int32_t argc, char **argv) {
             // Crop the frame to get useful stuff
             frame(Rect(Point(0, 0), Point(640, 370))).copyTo(cropped_frame);
 
+      ///////////////////////// auto brightness /////////////////////
             // Automatically increase the brightness and contrast of the video.
             BrightnessAndContrastAuto(cropped_frame, brightened_frame, 0.6f);
             // Convert from BGR to HSV colorspace
             cvtColor(brightened_frame, frame_HSV, COLOR_RGB2HSV);
+            //==//////////////////////////////////////////////////////==//
+
+            ////////////// no auto brightness ////////////////////
+            // cvtColor(cropped_frame, frame_HSV, COLOR_RGB2HSV);
+            ////////////////////////////////////////////////
+
             // Detect the object based on HSV Range Values
             inRange(frame_HSV, Scalar(low_H_pink, low_S_pink, low_V_pink), Scalar(high_H_pink, high_S_pink, high_V_pink), frame_threshold_pink);
 
@@ -358,7 +365,6 @@ void checkCarPosition(double centerX, OD4Session *od4) {
 }
 
 // the function draws all the squares in the image
-// followcar variable - 0 = pink/other car, 1 = green/acc car
 static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, OD4Session *od4, double *prev_area)
 {
    Scalar color = Scalar(255,0,0 );
@@ -474,11 +480,11 @@ void BrightnessAndContrastAuto(const cv::Mat &src, cv::Mat &dst, float clipHistP
 // as the picamera seems to have a lower...color range than the algorithm,
 // a hardcoded little boost of brightness and contrast is given
 // by artificially bumping/lowering the values of both the upper and lower ends of the histogram
-        for (int a = 1; a < histSize/9; a++) {
+        for (int a = 1; a < histSize/10; a++) {
             accumulator[a] = (accumulator[a - 1] + hist.at<float>(a)) / 2;
             // cout << "accumulator ["<< a << "]: " << accumulator[a] << endl;
         }
-        for (int i = histSize - 1; i > histSize - histSize/8 ; i--) {
+        for (int i = histSize - 1; i > histSize - histSize/11 ; i--) {
             accumulator[i] = (accumulator[i - 1] + hist.at<float>(i)) * 2;
             // cout << "accumulator ["<< i << "]: " << accumulator[i] << endl;
         }
