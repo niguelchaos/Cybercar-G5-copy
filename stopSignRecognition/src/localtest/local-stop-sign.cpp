@@ -139,7 +139,7 @@ void detectAndDisplayStopSign( Mat frame)
         }
 
         //It compares the previous state with the current one and it reports it if there is a change of state
-            bool valueToReport = insertCurrentFrameStopSign(stopSignArea > 8000);
+            bool valueToReport = insertCurrentFrameStopSign(stopSignArea > 3000);
             if(stopSignPresent != valueToReport){
                 stopSignPresent = valueToReport;
                 stopSignPresenceUpdate.stopSignPresence(valueToReport);
