@@ -51,7 +51,7 @@ void detectAndDisplayStopSign( Mat frame, OD4Session *od4);
 String stopSignCascadeName;
 CascadeClassifier stopSignCascade;
 bool stopSignPresent = false;
-const int lookBackNoOfFrames = 6;
+const int lookBackNoOfFrames = 8;
 int NO_OF_STOPSIGNS_REQUIRED = 5;
 int currentIndex = 0;
 bool seenFrameStopsigns[lookBackNoOfFrames] = {false};
@@ -201,7 +201,7 @@ void detectAndDisplayStopSign( Mat frame, OD4Session *od4)
         }
 
         //It compares the previous state with the current one and it reports it if there is a change of state
-            bool valueToReport = insertCurrentFrameStopSign(stopSignArea > 8000);
+            bool valueToReport = insertCurrentFrameStopSign(stopSignArea > 3500);
             if(stopSignPresent != valueToReport){
                 stopSignPresent = valueToReport;
                 stopSignPresenceUpdate.stopSignPresence(valueToReport);
