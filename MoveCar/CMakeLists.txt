@@ -14,11 +14,11 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
- 
+
 cmake_minimum_required(VERSION 3.2)
 project(follow)
 set(CMAKE_CXX_STANDARD 14)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Werror")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Werror -Wno-error=maybe-uninitialized -Wno-error=unused-variable")
 
 set(OPENDLV_MESSAGE_SET messages.odvd)
 set(CLUON_COMPLETE cluon-complete.hpp)

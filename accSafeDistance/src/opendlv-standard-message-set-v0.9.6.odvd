@@ -409,3 +409,6 @@ message SteeringCorrectionRequest [id = 2005] {
 message SpeedCorrectionRequest [id = 2006] {
    float amount [id = 1];
 }
+
+message CarOutOfSight[id = 2011]{
+}

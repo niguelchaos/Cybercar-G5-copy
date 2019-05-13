@@ -215,3 +215,4 @@ void detectAndDisplayStopSign( Mat frame, OD4Session *od4)
     // -- Opens a new window with the Stop sign recognition on
    // imshow( "stopSign", frame );
 }
+
