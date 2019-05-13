@@ -39,6 +39,12 @@ int NO_OF_STOPSIGNS_REQUIRED = 5;
 int currentIndex = 0;
 bool seenFrameStopsigns[lookBackNoOfFrames] = {false};
 
+bool stopSignPresent = false;
+const int lookBackNoOfFrames = 20;
+int NO_OF_STOPSIGNS_REQUIRED = 5;
+int currentIndex = 0;
+bool seenFrameStopsigns[lookBackNoOfFrames] = {false};
+
 void detectAndDisplayStopSign( Mat frame );
 
 static void help(const char* programName)

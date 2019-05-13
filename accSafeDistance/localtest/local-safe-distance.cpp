@@ -206,7 +206,7 @@ Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int followca
     int group_thresh = 1;
    double merge_box_diff = 0.6; // how much rectangles have to overlap to merge
 
-   cout << "before: " << boundRect.size();
+   // cout << "before: " << boundRect.size();
 
     // for each square...
     for( size_t i = 0; i < squares.size(); i++ )
@@ -259,11 +259,11 @@ Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, int followca
          // cout << "rect_y:     " << rect_y << "\n";
          // cout << "rect_width:       " << rect_width << "\n";
          // cout << "rect_height:      " << rect_height << "\n";
-         // cout << "area:       " << rect_area << "\n";
+         cout << "area:       " << rect_area << "\n";
 
     }
     groupRectangles(boundRect, group_thresh, merge_box_diff);  //group overlapping rectangles
-   cout << "         after: " << boundRect.size() << "\n";
+   // cout << "         after: " << boundRect.size() << "\n";
    countCars(image, boundRect);
 
    return image;
@@ -286,8 +286,8 @@ int main(int argc, char** argv) {
    const int max_value = 255;
 
 // Pink
-   int low_H_pink = 120;
-   int low_S_pink = 10;
+   int low_H_pink = 140;
+   int low_S_pink = 50;
    int low_V_pink = 30;
    int high_H_pink = max_value_H;
    int high_S_pink = max_value;
