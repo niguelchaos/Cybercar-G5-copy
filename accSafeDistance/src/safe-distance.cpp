@@ -140,8 +140,8 @@ int32_t main(int32_t argc, char **argv) {
 
          // Pink
             int low_H_pink = 135;
-            int low_S_pink = 55;
-            int low_V_pink = 65;
+            int low_S_pink = 54;
+            int low_V_pink = 69;
             int high_H_pink = max_value_H;
             int high_S_pink = max_value;
             int high_V_pink = max_value;
@@ -150,14 +150,14 @@ int32_t main(int32_t argc, char **argv) {
             frame(Rect(Point(0, 0), Point(640, 370))).copyTo(cropped_frame);
 
       ///////////////////////// auto brightness /////////////////////
-            // // Automatically increase the brightness and contrast of the video.
-            // BrightnessAndContrastAuto(cropped_frame, brightened_frame, 0.6f);
-            // // Convert from BGR to HSV colorspace
-            // cvtColor(brightened_frame, frame_HSV, COLOR_RGB2HSV);
+            // Automatically increase the brightness and contrast of the video.
+            BrightnessAndContrastAuto(cropped_frame, brightened_frame, 0.6f);
+            // Convert from BGR to HSV colorspace
+            cvtColor(brightened_frame, frame_HSV, COLOR_RGB2HSV);
             //==//////////////////////////////////////////////////////==//
 
             ////////////// no auto brightness ////////////////////
-            cvtColor(cropped_frame, frame_HSV, COLOR_RGB2HSV);
+            // cvtColor(cropped_frame, frame_HSV, COLOR_RGB2HSV);
             ////////////////////////////////////////////////
 
             // Detect the object based on HSV Range Values
