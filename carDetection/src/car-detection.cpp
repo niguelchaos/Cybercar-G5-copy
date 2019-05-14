@@ -62,7 +62,7 @@ static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, vecto
 void checkCarPosition(OD4Session *od4, double *prev_centerX, double *prev_centerY, double centerX, double centerY,
    double *prev_area, double area, bool *stop_line_arrived, bool *stop_line_arrived_trigger,
    vector<Point> &initial_car_positions, int *cars_in_queue, int *car_leave_timeout_counter);
-void countCars(Mat frame, vector<Point> &initial_car_positions , int *cars_in_queue);
+void countCars(Mat frame, vector<Point> &initial_car_positions , int *cars_in_queue, bool *stop_line_arrived);
 void detectCars(
    OD4Session *od4, Mat& image, const vector<vector<Point> >& squares, vector<Rect> &boundRects,
    double *prev_area, double *prev_centerX, double *prev_centerY,
@@ -168,7 +168,7 @@ int32_t main(int32_t argc, char **argv) {
 
          // Pink
             int low_H_pink = 135;
-            int low_S_pink = 50;
+            int low_S_pink = 55;
             int low_V_pink = 65;
             int high_H_pink = max_value_H;
             int high_S_pink = max_value;
@@ -223,10 +223,11 @@ int32_t main(int32_t argc, char **argv) {
             framecounter++;
             if (timestampsecs != prevtimestampsecs) {
 
-               if (stop_line_arrived_trigger == true & stop_line_arrived == false) {
+               if (stop_line_arrived_trigger == true && stop_line_arrived == false) {
                   // wait 6 seconds
                   if (stop_line_arrived_trigger_counter > 0) { stop_line_arrived_trigger_counter -= 1;   }
                   cout << "                   [ STOP LINE ARRIVED TRIGGERED: " << stop_line_arrived_trigger_counter << "]" << endl;
+                  stop_line_arrived = true;
                }
 
                if (car_leave_timeout_counter > 0) {
@@ -359,7 +360,7 @@ static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, vecto
    return image;
 }
 
-void countCars(Mat frame, vector<Point> &initial_car_positions, int *cars_in_queue) {
+void countCars(Mat frame, vector<Point> &initial_car_positions, int *cars_in_queue, bool *stop_line_arrived) {
    int car_num = 0;
    if (initial_car_positions[0] != Point(0,0)) {
       car_num += 1;
@@ -376,9 +377,12 @@ void countCars(Mat frame, vector<Point> &initial_car_positions, int *cars_in_que
    std::string car_count = std::to_string(car_num);
    std::string max_car_count = std::to_string(*cars_in_queue);
 
-   if (*cars_in_queue < car_num) {
-      *cars_in_queue = car_num; // remember the maximum amount of cars seen
+   if (*stop_line_arrived == false) {
+      if (*cars_in_queue < car_num) {
+         *cars_in_queue = car_num; // remember the maximum amount of cars seen
+      }
    }
+
 
    cout << "  [<    CARS IN QUEUE : " << max_car_count << "  >]" << endl ;
    if (car_num == 0) {
@@ -424,10 +428,7 @@ void detectCars(
          prev_area, rect_area, stop_line_arrived, stop_line_arrived_trigger,
          initial_car_positions, cars_in_queue, car_leave_timeout_counter);
 
-      countCars(image, initial_car_positions, cars_in_queue);
-      // if (*stop_line_arrived == false) {
-
-      // }
+      countCars(image, initial_car_positions, cars_in_queue, stop_line_arrived);
 
       *prev_area = rect_area; // remember this frame's area for the next frame
       *prev_centerX = rect_centerX;
@@ -447,14 +448,18 @@ void checkCarPosition( OD4Session *od4,
    int left_offset;
    int right_offset;
 
+   if (area > 50000) {  *stop_line_arrived = false;   }
+
    if (*stop_line_arrived == false) {
-      left_offset = 220;
+      left_offset = 270;
       right_offset = 50;
    }
    if (*stop_line_arrived == true) {
       left_offset = 320;
       right_offset = 25;
    }
+
+   cout << "   [ Area: " << area << " ] " << endl;
 
    switch (*stop_line_arrived) {
       case false:
@@ -512,9 +517,18 @@ void checkCarPosition( OD4Session *od4,
             if (centerX_diff < 0 && centerY_diff > 0) { // moving closer and towards the left
                if (area > 2000) {                        // if car is getting bigger
                   cout << "   / Car leaving Intersection, towards our lane. /" << endl;
-                  if (centerX < 40 && centerY > 180) {   // if very close to the bottom left of the frame
+                  if (centerX < 30 && centerY > 250) {   // if very close to the bottom left of the frame
                      cout << " /// Car has left intersection on our lane. ///" << endl;
                      *cars_in_queue -= 1;
+
+                     for (int i = 0; i < 3; i++) {
+                        if (initial_car_positions[i] != Point(0,0)) {
+                           initial_car_positions[i] = Point(0,0);
+                           cout << "Car deleted from queue." << endl;
+                           break;
+                        }
+                     }
+
                      *car_leave_timeout_counter = 8; // new car must wait 5 seconds before leaving
                      cout << "            [ TIMEOUT ON ] " << *car_leave_timeout_counter << endl;
                   }
@@ -524,9 +538,18 @@ void checkCarPosition( OD4Session *od4,
             //  if car is going higher in the frame and relatively straight
             else if (centerY_diff < 5 && centerX_diff > -20 && centerX_diff < 20) {
                cout << "   | Car leaving Intersection, towards 12 o clock. | " << endl;
-               if (area < 1500) {            // if car is very far away
+               if (area < 1200) {            // if car is very far away
                   cout << "    || Car has left intersection at 12 o clock. || " << endl;
                   *cars_in_queue -= 1;
+
+                  for (int i = 0; i < 3; i++) {
+                     if (initial_car_positions[i] != Point(0,0)) {
+                        initial_car_positions[i] = Point(0,0);
+                        cout << "Car deleted from queue." << endl;
+                        break;
+                     }
+                  }
+
                   *car_leave_timeout_counter = 8;
                   cout << "            [ TIMEOUT ON ] " << *car_leave_timeout_counter << endl;
                }
@@ -535,22 +558,40 @@ void checkCarPosition( OD4Session *od4,
             // if car is relatively going in a straight line horizontally and is moving left
             else if (centerX_diff < 5 && centerY_diff > -10 && centerY_diff < 10 ) {
                cout << "   < Car leaving Intersection, towards 9 o clock. < " << endl;
-               if (centerX < 40 && centerY < 180) {
+               if (centerX < 30 && centerY < 200) {
                   cout << "   <<< Car has left Intersection, towards 9 o clock. <<< " << endl;
                   *cars_in_queue -= 1;
+
+                  for (int i = 0; i < 3; i++) {
+                     if (initial_car_positions[i] != Point(0,0)) {
+                        initial_car_positions[i] = Point(0,0);
+                        cout << "Car deleted from queue." << endl;
+                        break;
+                     }
+                  }
+
                   *car_leave_timeout_counter = 8;
                   cout << "            [ TIMEOUT ON ] " << *car_leave_timeout_counter << endl;
                }
             }
          }
 
-         if (centerX > frame_center + right_offset) {
 
-            if (centerX_diff > 0) {
+         if (centerX > frame_center + right_offset) {
+            if (centerX_diff > 0 && centerY_diff > -5 && centerY_diff < 5) {
                cout << "    > Car leaving Intersection towards 3 o clock >" << endl;
                if (centerX > 600) {
                   cout << "   >> Car has left at 3 o clock >> " << endl;
                   *cars_in_queue -= 1;
+
+                  for (int i = 0; i < 3; i++) {
+                     if (initial_car_positions[i] != Point(0,0)) {
+                        initial_car_positions[i] = Point(0,0);
+                        cout << "Car deleted from queue." << endl;
+                        break;
+                     }
+                  }
+
                   *car_leave_timeout_counter = 8;
                   cout << "            [ TIMEOUT ON ] " << *car_leave_timeout_counter << endl;
                }
@@ -558,21 +599,9 @@ void checkCarPosition( OD4Session *od4,
          }
       }
 
-
       break;
 
    }
-   // cout << " [[ area: " << area << " ]]";
-   // cout << " // Area diff: " << area_diff << " // ";
-   // if (area_diff < -100) { // If the car is moving away
-   //    cout << "Car moving away   " << endl;
-   // }
-   // if (area_diff >= -100 && area_diff < 100) {
-   //    cout << "car stationary " << endl;
-   // }
-   // if (area_diff >= 100) {
-   //    cout << " car coming closer   " << endl ;
-   // }
 }
 
 // https://answers.opencv.org/question/75510/how-to-make-auto-adjustmentsbrightness-and-contrast-for-image-android-opencv-image-correction/
@@ -629,7 +658,7 @@ void BrightnessAndContrastAuto(const cv::Mat &src, cv::Mat &dst, float clipHistP
         clipHistPercent *= (max / 100.0f); //make percent as absolute
         // cout << "clipHistPercent % : " << clipHistPercent << endl;
 
-        clipHistPercent /= 1.2f; // left and right wings
+        clipHistPercent /= 1.3f; // left and right wings
         // cout << "clipHistPercent L/R wings : " << clipHistPercent << endl;
 
         // locate left cut
