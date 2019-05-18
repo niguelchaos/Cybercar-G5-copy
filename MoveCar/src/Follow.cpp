@@ -64,7 +64,7 @@ void MoveForward(cluon::OD4Session& od4, float speed, bool VERBOSE)
 			std::chrono::duration<double> elapsed_seconds = now-lastTimeZeroSpeed; // Calculate the time the car stands still
 			if (elapsed_seconds.count() >= 7) {
 				standingStillForPeriodOfTime = true;
-	    			std::cout << "Not moving for 5 seconds. We are standing behind a car at the intersection. \n";
+	    			std::cout << "Not moving for 7 seconds. We are standing behind a car at the intersection. \n";
 			}
 		}
 
@@ -252,30 +252,6 @@ int32_t main(int32_t argc, char **argv) {
 
 
         while(od4.isRunning()) {
-// only sends messages
-
-		/*HelloWorld helloWorld;
-		helloWorld.helloWorld("i HATE CAR");
-		od4.send(helloWorld);
-		if (VERBOSE) std::cout << "Hello World sent (i HATE CAR)" << std::endl;
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-
-		SpeedCorrectionRequest speedCorrection;
-		speedCorrection.amount(1);
-		od4.send(speedCorrection);
-
-		std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-
-		SteeringCorrectionRequest steeringCorrection;
-		steeringCorrection.amount(-1);
-		od4.send(steeringCorrection);
-
-
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-
-		StopSignPresenceUpdate stopSign;
-		stopSign.stopSignPresence(true);
-		od4.send(stopSign);*/	
 		
 		}
 		return 0;
