@@ -189,7 +189,7 @@ int32_t main(int32_t argc, char **argv) {
             if (timestampsecs > prevtimestampsecs) {
                // framecounter > 2 reduces accidental increases due to startup of image
                // only send message once
-               if (lost_visual_frame_counter == 3 && framecounter > 2 && sent_lost_visual == false) {
+               if (lost_visual_frame_counter == 3 && framecounter > 1 && sent_lost_visual == false) {
                   stopLineLostVisual(&od4, &lost_visual_sec_count, &sent_lost_visual);
                }
                // reset if car is seen again
@@ -546,7 +546,7 @@ void BrightnessAndContrastAuto(const cv::Mat &src, cv::Mat &dst, float clipHistP
            maxGray--;
         }
     }
-    cout << "Min:  " << minGray << " || Max" << maxGray << endl;
+    // cout << "Min:  " << minGray << " || Max" << maxGray << endl;
 
     // current range
     float inputRange = (float)maxGray - (float)minGray;
