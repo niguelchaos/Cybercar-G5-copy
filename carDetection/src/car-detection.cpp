@@ -122,6 +122,7 @@ int32_t main(int32_t argc, char **argv) {
 
          bool left_car_is_12oclock_car = false;
 
+         bool leading_car_gone = false; // know when to start looking for cars
          bool yeet_sent = false; // used to know when to stop looking for cars
 
          const float MINFRONTDIST = 0.1f;
@@ -142,8 +143,8 @@ int32_t main(int32_t argc, char **argv) {
 
          float currentDistance{0.0};
          auto onDistanceReadingAtStopLine {
-            [&od4,
-            &stop_line_arrived, &currentDistance, &initial_car_positions, &cars_in_queue, &car_leave_timeout_counter, &yeet_sent,
+            [&od4, &stop_line_arrived, &currentDistance, &initial_car_positions,
+            &cars_in_queue, &car_leave_timeout_counter, &yeet_sent,
             MINFRONTDIST, LEFTINTERSECTFRONTDIST, MINLEFTDIST, MAXLEFTDIST]
             (cluon::data::Envelope &&envelope) {
                auto msg = cluon::extractMessage<opendlv::proxy::DistanceReading>(std::move(envelope));
@@ -171,6 +172,19 @@ int32_t main(int32_t argc, char **argv) {
             }
          };
          od4.dataTrigger(opendlv::proxy::DistanceReading::ID(), onDistanceReadingAtStopLine);
+
+         // Function to move forward to approach the stop line
+      	auto onCarOutOfSight {
+            [&od4, VERBOSE, &leading_car_gone](cluon::data::Envelope &&envelope) {
+
+      		auto msg = cluon::extractMessage<CarOutOfSight>(std::move(envelope));
+      		cout << "     [ Leading Car out of sight ]  " << endl;
+            leading_car_gone = true;
+      		}
+      	};
+      	od4.dataTrigger(CarOutOfSight::ID(), onCarOutOfSight);
+
+
 
          // Endless loop; end the program by pressing Ctrl-C.
          while (od4.isRunning()) {
@@ -240,15 +254,17 @@ int32_t main(int32_t argc, char **argv) {
             findSquares(frame_threshold, squares);
             final_frame = drawSquares(frame_threshold, squares, boundRects, &od4);
 
-            if (yeet_sent == false) {
-               detectCars(&od4, final_frame, squares, boundRects, &prev_area, &prev_centerX, &prev_centerY,
-                  &cars_in_queue, &car_leave_timeout_counter, &stop_line_arrived, &stop_line_arrived_trigger,
-                  initial_car_positions, &left_car_is_12oclock_car);
+            if (leading_car_gone == true) {
+               if (yeet_sent == false) {
+                  detectCars(&od4, final_frame, squares, boundRects, &prev_area, &prev_centerX, &prev_centerY,
+                     &cars_in_queue, &car_leave_timeout_counter, &stop_line_arrived, &stop_line_arrived_trigger,
+                     initial_car_positions, &left_car_is_12oclock_car);
+               }
             }
 
             // notify movecar when it is time to go
             if (stop_line_arrived == true && cars_in_queue == 0 && yeet_sent == false) {
-               TimeToYeetOutOfIntersection yeet;
+               SafeToGo yeet;
                od4.send(yeet);
                cout << endl << " --=== Time to leave intersection. Waiting for direction. ===-- " << endl;
                yeet_sent = true;
@@ -630,10 +646,10 @@ void checkCarPosition( OD4Session *od4,
             }
 
             //  if car is going higher in the frame and relatively straight
-            else if (centerY_diff > 1 && centerX_diff > -20 && centerX_diff < 20) {
-               if (centerX > 50) {
+            else if (centerY_diff > -0.5 && centerX_diff > -20 && centerX_diff < 10) {
+               if (centerX > 210) {
                   cout << "   | Car leaving Intersection, towards 12 o clock. | " << endl;
-                  if (area < 1000) {            // if car is very far away
+                  if (area < 1100) {            // if car is very far away
                      cout << "    || Car has left intersection at 12 o clock. || " << endl;
                      removeCarFromQueue(initial_car_positions, cars_in_queue, car_leave_timeout_counter);
                   }
@@ -643,7 +659,7 @@ void checkCarPosition( OD4Session *od4,
             // if car is relatively going in a straight line horizontally and is moving left
             else if (centerX_diff < -0.5 && centerY_diff > -5 && centerY_diff < 5 ) {
                cout << "   < Car leaving Intersection, towards 9 o clock. < " << endl;
-               if (centerX < 30 && centerY < 200) {
+               if (centerX < 30 && centerY > 150 && centerY <= 240) {
                   cout << "   <<< Car has left Intersection, towards 9 o clock. <<< " << endl;
                   removeCarFromQueue(initial_car_positions, cars_in_queue, car_leave_timeout_counter);
                }
@@ -654,7 +670,7 @@ void checkCarPosition( OD4Session *od4,
          if (centerX > frame_center + right_offset) {
             if (centerX_diff > 0.5 && centerY_diff > -5 && centerY_diff < 5) {
                cout << "    > Car leaving Intersection towards 3 o clock >" << endl;
-               if (centerX > 500) {
+               if (centerX > 550) {
                   cout << "   >> Car has left at 3 o clock >> " << endl;
                   removeCarFromQueue(initial_car_positions, cars_in_queue, car_leave_timeout_counter);
                }
