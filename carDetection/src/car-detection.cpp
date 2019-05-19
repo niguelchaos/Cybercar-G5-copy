@@ -59,6 +59,7 @@ static double angle( Point pt1, Point pt2, Point pt0 );
 static void findSquares( const Mat& image, vector<vector<Point> >& squares );
 static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, vector<Rect> &boundRects, OD4Session *od4);
 
+void removeCarFromQueue( vector<Point> &initial_car_positions, int *cars_in_queue, int *car_leave_timeout_counter);
 void checkCarPosition(OD4Session *od4, double *prev_centerX, double *prev_centerY, double centerX, double centerY,
    double *prev_area, double area, bool *stop_line_arrived, bool *stop_line_arrived_trigger, bool *left_car_is_12oclock_car,
    vector<Point> &initial_car_positions, int *cars_in_queue, int *car_leave_timeout_counter);
@@ -125,7 +126,7 @@ int32_t main(int32_t argc, char **argv) {
 
          const float MINFRONTDIST = 0.1f;
          // const float MAXFRONTDIST = 0.8f;
-         const float LEFTINTERSECTFRONTDIST = 0.6f;
+         const float LEFTINTERSECTFRONTDIST = 0.4f;
 
          const float MINLEFTDIST = 0.05f;
          const float MAXLEFTDIST = 0.4f;
@@ -155,34 +156,14 @@ int32_t main(int32_t argc, char **argv) {
                   if(senderStamp == 0) { // front sensor
                      if (currentDistance > MINFRONTDIST && currentDistance < LEFTINTERSECTFRONTDIST) {
                         cout << "    Sensor Detection    || Car passed by, either going right or straight: " << currentDistance << endl;
-                        cars_in_queue -= 1;
-
-                        for (int i = 0; i < 3; i++) {
-                           if (initial_car_positions[i] != Point(0,0)) {
-                              initial_car_positions[i] = Point(0,0);
-                              cout << "Car deleted from queue." << endl;
-                              break;
-                           }
-                        }
-                        car_leave_timeout_counter = 4;
-                        cout << "            [ TIMEOUT ON ] " << car_leave_timeout_counter << endl;
+                        removeCarFromQueue(initial_car_positions, &cars_in_queue, &car_leave_timeout_counter);
                      }
                   }
 
                   if (senderStamp == 1) {
                      if (currentDistance > MINLEFTDIST && currentDistance < MAXLEFTDIST) {
-                        cout << "    Sensor Detection    << Car passed by left: " << currentDistance << endl;
-                        cars_in_queue -= 1;
-
-                        for (int i = 0; i < 3; i++) {
-                           if (initial_car_positions[i] != Point(0,0)) {
-                              initial_car_positions[i] = Point(0,0);
-                              cout << "Car deleted from queue." << endl;
-                              break;
-                           }
-                        }
-                        car_leave_timeout_counter = 4;
-                        cout << "            [ TIMEOUT ON ] " << car_leave_timeout_counter << endl;
+                        cout << "    Sensor Detection     /// Car has left intersection on our lane: " << currentDistance << endl;
+                        removeCarFromQueue(initial_car_positions, &cars_in_queue, &car_leave_timeout_counter);
                      }
                   }
 
@@ -274,9 +255,9 @@ int32_t main(int32_t argc, char **argv) {
             }
              // Display image. For testing recordings only.
             if (VERBOSE) {
-               imshow("Detected cars", final_frame);
-               imshow("original frame", cropped_frame);
-               imshow("brightened bois", brightened_frame);
+               // imshow("Detected cars", final_frame);
+               // imshow("original frame", cropped_frame);
+               // imshow("brightened bois", brightened_frame);
                cv::waitKey(1);
             }
 
@@ -497,10 +478,61 @@ void detectCars(
    }
 }
 
+void removeCarFromQueue( vector<Point> &initial_car_positions, int *cars_in_queue, int *car_leave_timeout_counter) {
+
+   if (*cars_in_queue == 1) { // deleting the only one left
+      if (initial_car_positions[0] != Point(0,0)) {
+         initial_car_positions[0] = Point(0,0);
+         cout << "   Left Car deleted from queue." << endl;
+      }
+      else if (initial_car_positions[1] != Point(0,0)) {
+         initial_car_positions[1] = Point(0,0);
+         cout << "   Middle Car deleted from queue." << endl;
+      }
+      else if (initial_car_positions[2] != Point(0,0)) {
+         initial_car_positions[2] = Point(0,0);
+         cout << "   Right Car deleted from queue." << endl;
+      }
+   }
+
+   else if (*cars_in_queue == 2) {
+      if (initial_car_positions[0] == Point(0,0)) {
+         cout << "No left car. Therefore  |||| >>>> ." << endl;
+      }
+      if (initial_car_positions[1] == Point(0,0)) {
+         cout << "No middle car. Therefore   <<<< >>>> ." << endl;
+      }
+      if (initial_car_positions[2] == Point(0,0)) {
+         cout << "No right car. Therefore    <<<< |||| ." << endl;
+      }
+      for (int i = 0; i < 3; i++) {
+         if (initial_car_positions[i] != Point(0,0)) {
+            initial_car_positions[i] = Point(0,0);
+            cout << "Car deleted from queue." << endl;
+            break;
+         }
+      }
+
+   }
+   else if (*cars_in_queue == 3) {
+      for (int i = 0; i < 3; i++) {
+         if (initial_car_positions[i] != Point(0,0)) {
+            initial_car_positions[i] = Point(0,0);
+            cout << "Car deleted from queue." << endl;
+            break;
+         }
+      }
+   }
+
+   *cars_in_queue -= 1;
+   *car_leave_timeout_counter = 4; // new car must wait 4 seconds before leaving
+   cout << "            [ TIMEOUT ON ] " << *car_leave_timeout_counter << endl;
+}
+
 void checkCarPosition( OD4Session *od4,
    double *prev_centerX, double *prev_centerY, double centerX, double centerY,
    double *prev_area, double area, bool *stop_line_arrived, bool *stop_line_arrived_trigger, bool *left_car_is_12oclock_car,
-   vector<Point> &initial_car_positions, int *cars_in_queue, int *car_leave_timeout_counter) {
+   vector<Point> &initial_car_positions, int *cars_in_queue, int *car_leave_timeout_counter ) {
 
    double centerX_diff = centerX - *prev_centerX; // looks at whether or not car has moved
    double centerY_diff = centerY - *prev_centerY;
@@ -509,6 +541,9 @@ void checkCarPosition( OD4Session *od4,
    int left_offset;
    int right_offset;
    int stop_line_arrival_offset = 220;
+
+   // int front_car_boundaryX = 100;
+   // int front_car_boundaryY = 240;
 
    if (area > 50000) {  *stop_line_arrived = false;   }
 
@@ -557,7 +592,9 @@ void checkCarPosition( OD4Session *od4,
             cout << "   |||| ADDED MIDDLE CAR: " << initial_car_positions[1] << endl;
          }
          else if (centerX_diff < 0 && centerY_diff > 0) {
-            cout << "Detected car on middle, probably car at 12 o clock." << endl;
+            if (*left_car_is_12oclock_car == false) {
+               cout << "Detected car on middle, probably car at 12 o clock." << endl;
+            }
          }
       }
 
@@ -583,87 +620,43 @@ void checkCarPosition( OD4Session *od4,
          if (centerX >= frame_center - left_offset && centerX < frame_center + right_offset) {
 
             if (centerX_diff < 0 && centerY_diff > 0) { // moving closer and towards the left
-               if (area > 2000) {                        // if car is getting bigger
+               if (area > 1700) {                        // if car is getting bigger
                   cout << "   / Car leaving Intersection, towards our lane. /" << endl;
-                  if (centerX < 30 && centerY > 250) {   // if very close to the bottom left of the frame
-                     cout << " /// Car has left intersection on our lane. ///" << endl;
-                     *cars_in_queue -= 1;
-
-                     for (int i = 0; i < 3; i++) {
-                        if (initial_car_positions[i] != Point(0,0)) {
-                           initial_car_positions[i] = Point(0,0);
-                           cout << "Car deleted from queue." << endl;
-                           break;
-                        }
-                     }
-
-                     *car_leave_timeout_counter = 4; // new car must wait 5 seconds before leaving
-                     cout << "            [ TIMEOUT ON ] " << *car_leave_timeout_counter << endl;
+                  if (centerX < 30 && centerY > 230) {   // if very close to the bottom left of the frame
+                     cout << " <<< Car has left intersection at 9 o clock. <<<" << endl;
+                     removeCarFromQueue(initial_car_positions, cars_in_queue, car_leave_timeout_counter);
                   }
                }
             }
 
             //  if car is going higher in the frame and relatively straight
-            else if (centerY_diff < 5 && centerX_diff > -20 && centerX_diff < 20) {
+            else if (centerY_diff > 1 && centerX_diff > -20 && centerX_diff < 20) {
                if (centerX > 50) {
                   cout << "   | Car leaving Intersection, towards 12 o clock. | " << endl;
                   if (area < 1000) {            // if car is very far away
                      cout << "    || Car has left intersection at 12 o clock. || " << endl;
-                     *cars_in_queue -= 1;
-
-                     for (int i = 0; i < 3; i++) {
-                        if (initial_car_positions[i] != Point(0,0)) {
-                           initial_car_positions[i] = Point(0,0);
-                           cout << "Car deleted from queue." << endl;
-                           break;
-                        }
-                     }
-
-                     *car_leave_timeout_counter = 4;
-                     cout << "            [ TIMEOUT ON ] " << *car_leave_timeout_counter << endl;
+                     removeCarFromQueue(initial_car_positions, cars_in_queue, car_leave_timeout_counter);
                   }
                }
             }
 
             // if car is relatively going in a straight line horizontally and is moving left
-            else if (centerX_diff < 5 && centerY_diff > -10 && centerY_diff < 10 ) {
+            else if (centerX_diff < -0.5 && centerY_diff > -5 && centerY_diff < 5 ) {
                cout << "   < Car leaving Intersection, towards 9 o clock. < " << endl;
                if (centerX < 30 && centerY < 200) {
                   cout << "   <<< Car has left Intersection, towards 9 o clock. <<< " << endl;
-                  *cars_in_queue -= 1;
-
-                  for (int i = 0; i < 3; i++) {
-                     if (initial_car_positions[i] != Point(0,0)) {
-                        initial_car_positions[i] = Point(0,0);
-                        cout << "Car deleted from queue." << endl;
-                        break;
-                     }
-                  }
-
-                  *car_leave_timeout_counter = 4;
-                  cout << "            [ TIMEOUT ON ] " << *car_leave_timeout_counter << endl;
+                  removeCarFromQueue(initial_car_positions, cars_in_queue, car_leave_timeout_counter);
                }
             }
          }
 
 
          if (centerX > frame_center + right_offset) {
-            if (centerX_diff > 0 && centerY_diff > -5 && centerY_diff < 5) {
+            if (centerX_diff > 0.5 && centerY_diff > -5 && centerY_diff < 5) {
                cout << "    > Car leaving Intersection towards 3 o clock >" << endl;
-               if (centerX > 600) {
+               if (centerX > 500) {
                   cout << "   >> Car has left at 3 o clock >> " << endl;
-                  *cars_in_queue -= 1;
-
-                  for (int i = 0; i < 3; i++) {
-                     if (initial_car_positions[i] != Point(0,0)) {
-                        initial_car_positions[i] = Point(0,0);
-                        cout << "Car deleted from queue." << endl;
-                        break;
-                     }
-                  }
-
-                  *car_leave_timeout_counter = 4;
-                  cout << "            [ TIMEOUT ON ] " << *car_leave_timeout_counter << endl;
+                  removeCarFromQueue(initial_car_positions, cars_in_queue, car_leave_timeout_counter);
                }
             }
          }
@@ -728,7 +721,7 @@ void BrightnessAndContrastAuto(const cv::Mat &src, cv::Mat &dst, float clipHistP
         clipHistPercent *= (max / 100.0f); //make percent as absolute
         // cout << "clipHistPercent % : " << clipHistPercent << endl;
 
-        clipHistPercent /= 1.3f; // left and right wings
+        clipHistPercent /= 1.25f; // left and right wings
         // cout << "clipHistPercent L/R wings : " << clipHistPercent << endl;
 
         // locate left cut
@@ -750,7 +743,7 @@ void BrightnessAndContrastAuto(const cv::Mat &src, cv::Mat &dst, float clipHistP
     // cout << "Input range: " << inputRange << endl;
     alpha = (histSize - 1) / inputRange;   // alpha expands current range to histsize range
     beta = (float)-minGray * (float)alpha; // beta shifts current range so that minGray will go to 0
-    // cout << " Added Contrast: " << alpha << "   || " << " Added Brightness: " << beta << endl;
+    cout << " Added Contrast: " << alpha << "   || " << " Added Brightness: " << beta << endl;
 
     // does the actual brightening.
     // Apply brightness and contrast normalization
