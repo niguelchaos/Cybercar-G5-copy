@@ -140,8 +140,8 @@ int32_t main(int32_t argc, char **argv) {
 
          // Pink
             int low_H_pink = 135;
-            int low_S_pink = 54;
-            int low_V_pink = 69;
+            int low_S_pink = 53;
+            int low_V_pink = 65;
             int high_H_pink = max_value_H;
             int high_S_pink = max_value;
             int high_V_pink = max_value;
@@ -168,10 +168,10 @@ int32_t main(int32_t argc, char **argv) {
 
              // Display image. For testing recordings only.
             if (VERBOSE) {
-               imshow("Pink", finalFramePink);
+               // imshow("Pink", finalFramePink);
                // // imshow("Green", finalFrameGreen);
-               imshow("original frame", cropped_frame);
-               imshow("brightened bois", brightened_frame);
+               // imshow("original frame", cropped_frame);
+               // imshow("brightened bois", brightened_frame);
                cv::waitKey(1);
             }
 
@@ -472,8 +472,8 @@ void BrightnessAndContrastAuto(const cv::Mat &src, cv::Mat &dst, float clipHistP
         clipHistPercent *= (max / 100.0f); //make percent as absolute
         // cout << "clipHistPercent % : " << clipHistPercent << endl;
 
-        clipHistPercent /= 1.4f; // left and right wings
-        cout << "clipHistPercent L/R wings : " << clipHistPercent << endl;
+        clipHistPercent /= 1.6f; // left and right wings
+        // cout << "clipHistPercent L/R wings : " << clipHistPercent << endl;
 
         // accumulator[0] = 0;
 
@@ -500,7 +500,7 @@ void BrightnessAndContrastAuto(const cv::Mat &src, cv::Mat &dst, float clipHistP
            maxGray--;
         }
     }
-    cout << "Min:  " << minGray << "  ||  Max" << maxGray << "   || " << endl;
+    cout << "Min:  " << minGray << " || Max" << maxGray << endl;
 
     // current range
     float inputRange = (float)maxGray - (float)minGray;
