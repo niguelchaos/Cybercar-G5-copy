@@ -55,15 +55,13 @@ using namespace std;
 using namespace cv;
 using namespace cluon;
 
-
-static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, OD4Session *od4, double *prev_area, int *lost_visual_frame_counter, bool *sent_lost_visual);
+static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, double *prev_area, OD4Session *od4);
 static void findSquares( const Mat& image, vector<vector<Point> >& squares );
 static double angle( Point pt1, Point pt2, Point pt0 );
+void checkCarIsMovingAndPosition(double *prev_area, double area, double centerX, double centerY, OD4Session *od4);
 void countCars(Mat frame, vector<Rect>& rects);
-void checkCarPosition(double centerX, OD4Session *od4) ;
-void checkCarDistance(double *prev_area, double area, double centerY, OD4Session *od4);
-void BrightnessAndContrastAuto(const cv::Mat &src, cv::Mat &dst, float clipHistPercent);
-void stopLineLostVisual(OD4Session *od4, int *lost_visual_sec_count, bool *sent_lost_visual);
+
+void BrightnessAndContrastAuto(const cv::Mat &src, cv::Mat &dst, float clipHistPercent = 0);
 
 int32_t main(int32_t argc, char **argv) {
    int32_t retCode{1};
@@ -98,26 +96,24 @@ int32_t main(int32_t argc, char **argv) {
          int64_t starttimestampsecs = starttimestampmicro / 1000000;
          cout << "Starting Timestamp: " << starttimestampsecs << endl;
 
+         // Stupid warnings say it needs to be initialized so here you go compiler stop complaining
          int64_t prevtimestampsecs = 0;
          int framecounter = 0;
 
-         double prev_area = 0; // used to determine whether car is moving and amount of acceleration
+         // used to determine whether car is moving and amount of acceleration
+         double prev_area = 0;
+         // double prev_centerY = 0;
 
-         int lost_visual_frame_counter = 0; // needs 3 frames to trigger 1 lost_visual_sec_count
-         int lost_visual_sec_count = 0;
-         bool sent_lost_visual = false;
          // Endless loop; end the program by pressing Ctrl-C.
          while (od4.isRunning()) {
             Mat frame;
             Mat frame_HSV;
             Mat frame_gray;
             Mat cropped_frame;
-            // Mat cropped_frame_BGR;
             Mat brightened_frame;
-
-            Mat frame_threshold_pink;
-            Mat finalFramePink;
-            vector<vector<Point> > pinkSquares;
+            Mat frame_threshold;
+            Mat final_frame;
+            vector<vector<Point> > squares;
 
             const int max_value_H = 360/2;
             const int max_value = 255;
@@ -145,60 +141,49 @@ int32_t main(int32_t argc, char **argv) {
 
          // Pink
             int low_H_pink = 135;
-            int low_S_pink = 53;
+            int low_S_pink = 50;
             int low_V_pink = 65;
             int high_H_pink = max_value_H;
             int high_S_pink = max_value;
             int high_V_pink = max_value;
 
+         // Green
+            // int low_H_green = 42;
+            // int low_S_green = 18;
+            // int low_V_green = 102;
+            // int high_H_green = 92;
+            // int high_S_green = 182;
+            // int high_V_green = 255;
+
             // Crop the frame to get useful stuff
             frame(Rect(Point(0, 0), Point(640, 370))).copyTo(cropped_frame);
-
-      ///////////////////////// auto brightness /////////////////////
             // Automatically increase the brightness and contrast of the video.
-            BrightnessAndContrastAuto(cropped_frame, brightened_frame, 0.6f);
+            BrightnessAndContrastAuto(cropped_frame, brightened_frame);
             // Convert from BGR to HSV colorspace
             cvtColor(brightened_frame, frame_HSV, COLOR_RGB2HSV);
-            //==//////////////////////////////////////////////////////==//
-
-            ////////////// no auto brightness ////////////////////
-            // cvtColor(cropped_frame, frame_HSV, COLOR_RGB2HSV);
-            ////////////////////////////////////////////////
-
             // Detect the object based on HSV Range Values
-            inRange(frame_HSV, Scalar(low_H_pink, low_S_pink, low_V_pink), Scalar(high_H_pink, high_S_pink, high_V_pink), frame_threshold_pink);
+            inRange(frame_HSV, Scalar(low_H_pink, low_S_pink, low_V_pink), Scalar(high_H_pink, high_S_pink, high_V_pink), frame_threshold);
 
-            findSquares(frame_threshold_pink, pinkSquares);
+            findSquares(frame_threshold, squares);
+            final_frame = drawSquares(frame_threshold, squares, &prev_area, &od4); // pass reference of prev_area
 
-            finalFramePink = drawSquares(frame_threshold_pink, pinkSquares, &od4, &prev_area, &lost_visual_frame_counter, &sent_lost_visual); // pass reference of prev_area
-
-            // findSquares(frame_threshold_green, greenSquares);
-            // finalFrameGreen = drawSquares(frame_threshold_green, greenSquares, 0, &od4);
 
              // Display image. For testing recordings only.
             if (VERBOSE) {
-               // imshow("Pink", finalFramePink);
-               // // imshow("Green", finalFrameGreen);
-               // imshow("original frame", cropped_frame);
-               // imshow("brightened bois", brightened_frame);
+               imshow("Pink", final_frame);
+               imshow("original frame", cropped_frame);
+               imshow("brightened bois", brightened_frame);
                cv::waitKey(1);
             }
 
             // measures FPS
             framecounter++;
-            if (timestampsecs > prevtimestampsecs) {
-               // framecounter > 2 reduces accidental increases due to startup of image
-               // only send message once
-               if (lost_visual_frame_counter == 3 && framecounter > 2 && sent_lost_visual == false) {
-                  stopLineLostVisual(&od4, &lost_visual_sec_count, &sent_lost_visual);
-               }
-               // reset if car is seen again
-               if (lost_visual_frame_counter == 0) {   lost_visual_sec_count = 0;  }
-
-               cout << "Timestamp: " << timestampsecs << "          FPS: " << framecounter << endl;
+            if (timestampsecs != prevtimestampsecs) {
+               cout << endl << "Timestamp: " << timestampsecs << "          FPS: " << framecounter ;
                prevtimestampsecs = timestampsecs;
                framecounter = 0;
             }
+
          }
       }
      retCode = 0;
@@ -251,7 +236,7 @@ static void findSquares( const Mat& image, vector<vector<Point> >& squares ) {
          else {
              // apply threshold if l!=0:
              //     tgray(x,y) = gray(x,y) < (l+1)*255/N ? 255 : 0
-             // 255 is max saturation/value. N is just a thresh level.
+             // 255 is max saturation/value. N is just a threshold level.
              gray = gray0 >= (l+1)*255/N;
          }
 
@@ -297,107 +282,41 @@ static void findSquares( const Mat& image, vector<vector<Point> >& squares ) {
    }
 }
 
-void checkCarDistance(double *prev_area, double area, double centerY, OD4Session *od4) {
-// PID controller
-// https://robotics.stackexchange.com/questions/9786/how-do-the-pid-parameters-kp-ki-and-kd-affect-the-heading-of-a-differential
-   SpeedCorrectionRequest speed_correction;
-   float correction_speed;
-   const float LOSTVISUAL = 1337;
-   const float DECELERATE = 999;  // code for Artificial "Letting go of the pedal"
+void checkCarIsMovingAndPosition(
+   double *prev_area, double area, double centerX, double centerY, OD4Session *od4) {
 
-   if (area < 1 || centerY > LOSTVISUAL - 1) {
-      correction_speed = LOSTVISUAL; // special code for visual lost
+   float area_diff = (float)area - (float) *prev_area; // looks at whether or not car has moved
+   int frame_center = 320;
+   int offset = 110;
+
+
+   cout << " [ center X: " << centerX << " ]   // ";
+   cout << "  // [[center Y: " << centerY << " ]] // " ;
+   if (centerX < frame_center - offset) {
+      cout << "   << Car on left " << endl;
    }
-   else {
-      float optimal_area = 8000; // default optimal area
-      float area_diff = (float)area - (float) *prev_area; // looks at how much car has accelerated/deccelerated
-      float accel_area_diff_thresh = 0;
-      float brake_area_diff_thresh = 600;
-
-      if (area_diff < accel_area_diff_thresh) { // If the car is moving away
-         optimal_area = optimal_area + (area_diff * 0.2f); // dampen (softly) accelerate
-      }
-
-      if (area_diff >= brake_area_diff_thresh) {
-         // make optimal area farther(smaller) if the car has accelerated a lot to brake earlier and harder.
-         // small differences dont make much of a difference - deals with large variations of area
-         optimal_area = optimal_area - (area_diff * 1.5f);
-      }
-      cout << endl << "         // Area diff: " << area_diff << "//    ";
-      cout << "New Opt Area: " << optimal_area << "//" << endl;
-
-   // the Integral and Derivative was not used due to time constraints.
-      float error = optimal_area - (float) area;
-      float kp = 1; // proportional gain constant, tunes controller. In our case, we have it as 1 to make it balanced.
-      float output = kp * error;
-
-      // braking needs to be stronger than accelerating, need to modify correction to suit it.
-      if (output > 0) { correction_speed = output / 7500000; }
-      if (output <= 0) { correction_speed = output / 100000; }
-
-   // braking needs to be faster than accelerating. I dont care.
-      if (correction_speed <= 0) { correction_speed = correction_speed * 5; } // hard multiplier by 5
-
-   // If the car in front has somewhat been maintaining the distance and area > 5000 (close enough)
-      if (error > 0 && error < 3000 && area_diff >= accel_area_diff_thresh && area_diff < brake_area_diff_thresh) {
-         correction_speed = DECELERATE;
-      }
-
-      cout << " [[ area: " << area << " ]]";
-      cout << "  // [[center Y: " << centerY << " ]] // ";
-      cout << "  << speed correction : " << correction_speed << " >> // " << endl;
+   if (centerX >= frame_center - offset && centerX < frame_center + offset) {
+      cout << "   || Car in middle ||" << endl;
+   }
+   if (centerX > frame_center + offset) {
+      cout << "   Car on right >>" << endl;
    }
 
-   speed_correction.amount(correction_speed);
-   od4->send(speed_correction);
-}
-
-void checkCarPosition(double centerX, OD4Session *od4) {
-
-   int frame_center = 320; // Setpoint - we want the car to ideally be in center.
-// PID controller test
-// https://robotics.stackexchange.com/questions/9786/how-do-the-pid-parameters-kp-ki-and-kd-affect-the-heading-of-a-differential
-   SteeringCorrectionRequest steering_correction;
-   float correction_angle;
-   const float LOSTVISUAL = 1337;
-
-   if (centerX > LOSTVISUAL - 1) { // notify movecar - compiler complains if its == 1337, so now its > 1336
-      correction_angle = LOSTVISUAL; // Special code for visual lost
+   cout << " [[ area: " << area << " ]]";
+   cout << " // Area diff: " << area_diff << " // ";
+   if (area_diff < -100) { // If the car is moving away
+      cout << "Car moving away   " << endl;
    }
-   else {
-      float error = frame_center - (float) centerX;
-
-   //////////////////////// Absolute pid steering correction ////////////////////
-      float kp = 1;
-      float output = kp * error; // Ki * integral + Kd * derivative
-      correction_angle = output / 800; // because groundsteering max = 0.4 here
-
-      cout << "[center X: " << centerX << " ]";
-      cout << " // [[ steering correction: " << correction_angle << " ]]  // " << endl;
+   if (area_diff >= -100 && area_diff < 100) {
+      cout << "car stationary " << endl;
    }
-
-   /////////////////////////// PID Controller test ////////////////////////////
-   steering_correction.amount(correction_angle);
-   od4->send(steering_correction);
-}
-
-void stopLineLostVisual(OD4Session *od4, int *lost_visual_sec_count, bool *sent_lost_visual) {
-   CarOutOfSight car_outta_sight;
-   *lost_visual_sec_count += 1;
-   cout << "lost visual secs: " << *lost_visual_sec_count << endl;
-
-   if (*lost_visual_sec_count > 2) {
-      cout << "            << Lost Visual Sent. >> " << endl;
-      *lost_visual_sec_count = 0;
-      *sent_lost_visual = true;
-      od4->send(car_outta_sight);
+   if (area_diff >= 100) {
+      cout << " car coming closer   " << endl ;
    }
 }
 
 // the function draws all the squares in the image
-static Mat drawSquares(
-   Mat& image, const vector<vector<Point> >& squares, OD4Session *od4,
-   double *prev_area, int *lost_visual_frame_counter, bool *sent_lost_visual)
+static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, double *prev_area, OD4Session *od4)
 {
    Scalar color = Scalar(255,0,0 );
    vector<Rect> boundRects( squares.size() );
@@ -417,21 +336,7 @@ static Mat drawSquares(
    double rect_centerX = 1337; // valid range from 0 - 640
    double rect_centerY = 1337; // valid range from 0 - 480
 
-   // if there are no bounding Rects....
-   if (boundRects.size() < 1) {
-      // ...notify Movecar component that car is nowhere to be seen / lost visual
-      checkCarDistance( prev_area, rect_area, rect_centerY, od4);
-      checkCarPosition( rect_centerX, od4);
-      // also begin counting if car is not seen for 5 seconds
-      if (*lost_visual_frame_counter < 3) {
-        *lost_visual_frame_counter += 1;
-      }
 
-      cout << "      counter: " << *lost_visual_frame_counter;
-      cout << "      | Lost Visual | " << endl;
-   }
-
-   // if no bounding boxes, for loop is not entered because "i < boundrects.size" is -1
    // only check distance and steering corrections, along with number of cars, after merging.
    for (size_t i = 0; i < boundRects.size(); i++) {
       int rect_x = boundRects[i].x;
@@ -449,18 +354,26 @@ static Mat drawSquares(
       Point bot_left(rect_x, rect_y + rect_height);
       Point bot_right(rect_x + rect_width, rect_y + rect_height);
 
-     checkCarDistance( prev_area, rect_area, rect_centerY, od4);
-     checkCarPosition( rect_centerX, od4);
+      countCars(image, boundRects);
 
-     if (rect_area > 50000) { // for testing
-        *sent_lost_visual = false;
-        cout << "         << Lost Visual Message Reset. >> " << endl;
-     }
-
-     *prev_area = rect_area; // remember this frame's area for the next frame
-     *lost_visual_frame_counter = 0; // resets everything if a car is seen again
+      checkCarIsMovingAndPosition( prev_area, rect_area, rect_centerX, rect_centerY, od4);
+      *prev_area = rect_area; // remember this frame's area for the next frame
    }
    return image;
+}
+
+void countCars(Mat frame, vector<Rect>& rects) {
+   int rect_num =  rects.size();
+   std::string car_count = std::to_string(rect_num);
+   if (rect_num == 0) {
+      // cout << "No cars. ";
+   }
+   else if (rect_num == 1) {
+      cout << "           [<  " << car_count << " car. >]  " << endl;
+   } else {
+      cout << "           [<  " << car_count << " cars. >] " << endl;
+   }
+   putText(frame, car_count, Point(5,100), FONT_HERSHEY_DUPLEX, 1, Scalar(255,255,255), 2);
 }
 
 // https://answers.opencv.org/question/75510/how-to-make-auto-adjustmentsbrightness-and-contrast-for-image-android-opencv-image-correction/
@@ -481,15 +394,13 @@ void BrightnessAndContrastAuto(const cv::Mat &src, cv::Mat &dst, float clipHistP
     //to calculate grayscale histogram
     cv::Mat gray;
     if (src.type() == CV_8UC1) gray = src;
-    // modified from BGR to RGB
-    else if (src.type() == CV_8UC3) cvtColor(src, gray, COLOR_RGB2GRAY);
-    else if (src.type() == CV_8UC4) cvtColor(src, gray, COLOR_RGBA2GRAY);
+    else if (src.type() == CV_8UC3) cvtColor(src, gray, COLOR_BGR2GRAY);
+    else if (src.type() == CV_8UC4) cvtColor(src, gray, COLOR_BGRA2GRAY);
     if (clipHistPercent <= 0)
     {
         // keep full available range
         // Finds the global minimum and maximum in an array.
         cv::minMaxLoc(gray, &minGray, &maxGray);
-      // cout << "Min:  || " << minGray << "Max" << maxGray << "||" << endl;
     }
     else
     {
@@ -504,58 +415,31 @@ void BrightnessAndContrastAuto(const cv::Mat &src, cv::Mat &dst, float clipHistP
         // calculate cumulative distribution from the histogram
         std::vector<float> accumulator(histSize);
         accumulator[0] = hist.at<float>(0);
-        // cout << "accumulator [0]: " << accumulator[0];
-
-
         for (int i = 1; i < histSize; i++)
         {
             accumulator[i] = accumulator[i - 1] + hist.at<float>(i);
         }
 
         // locate points that cuts at required value
-        float max = accumulator.back(); // last element of the array
-         // cout << "      accumulator max: " << max << endl;
+        float max = accumulator.back();
         clipHistPercent *= (max / 100.0f); //make percent as absolute
-        // cout << "clipHistPercent % : " << clipHistPercent << endl;
-
-        clipHistPercent /= 1.6f; // left and right wings
-        // cout << "clipHistPercent L/R wings : " << clipHistPercent << endl;
-
-        // accumulator[0] = 0;
-
-// as the picamera seems to have a lower...color range than the algorithm,
-// a hardcoded little boost of brightness and contrast is given
-// by artificially bumping/lowering the values of both the upper and lower ends of the histogram
-        // for (int a = 1; a < histSize/10; a++) {
-        //     accumulator[a] = (accumulator[a - 1] + hist.at<float>(a)) / 2;
-        //     // cout << "accumulator ["<< a << "]: " << accumulator[a] << endl;
-        // }
-        // for (int i = histSize - 1; i > histSize - histSize/11 ; i--) {
-        //     accumulator[i] = (accumulator[i - 1] + hist.at<float>(i)) * 2;
-        //     // cout << "accumulator ["<< i << "]: " << accumulator[i] << endl;
-        // }
-
+        clipHistPercent /= 2.0f; // left and right wings
         // locate left cut
         minGray = 0;
-        while (accumulator[(long)minGray] < clipHistPercent) {
-          minGray++;
-        }
+        while (accumulator[(long)minGray] < clipHistPercent)
+            minGray++;
+
         // locate right cut
         maxGray = histSize - 1;
-        while (accumulator[(long)maxGray] >= (max - clipHistPercent)) {
-           maxGray--;
-        }
+        while (accumulator[(long)maxGray] >= (max - clipHistPercent))
+            maxGray--;
     }
-    cout << "Min:  " << minGray << " || Max" << maxGray << endl;
 
     // current range
     float inputRange = (float)maxGray - (float)minGray;
-    // histSize is always 255
-    // inputrange in the end is always from 0 to 255
-    // maxgray is always 255 as well, and mingray is always 0 in the end.
+
     alpha = (histSize - 1) / inputRange;   // alpha expands current range to histsize range
-    beta = (float)-minGray * (float)alpha;  // beta shifts current range so that minGray will go to 0
-    cout << " Added Contrast: " << alpha << "   || " << " Added Brightness: " << beta << endl;
+    beta = (float)-minGray * (float)alpha;             // beta shifts current range so that minGray will go to 0
 
     // does the actual brightening.
     // Apply brightness and contrast normalization
