@@ -133,13 +133,21 @@ int32_t main(int32_t argc, char **argv) {
          const float MAXLEFTDIST = 0.4f;
 
          // Listen for when the car has arrived at stop line
-   		auto onArrivedAtStopLine {
-            [&od4, &stop_line_arrived](cluon::data::Envelope&&) {
-					cout << "We have arrived at the stop line. " << endl;
-   				stop_line_arrived = true;
+
+         auto onStopCar {
+            [&od4, &stop_line_arrived, &left_car_is_12oclock_car]
+            (cluon::data::Envelope &&envelope) {
+
+               auto msg = cluon::extractMessage<StopSignPresenceUpdate>(std::move(envelope));
+               bool stopSignPresence = msg.stopSignPresence(); // Get the bool
+               if (stopSignPresence == false) {
+                  cout << "We have arrived at the stop line. " << endl;
+      				stop_line_arrived = true;
+                  left_car_is_12oclock_car = true;
+               }
             }
          };
-         od4.dataTrigger(ArrivedAtStopLine::ID(), onArrivedAtStopLine);
+         od4.dataTrigger(StopSignPresenceUpdate::ID(), onStopCar);
 
          float currentDistance{0.0};
          auto onDistanceReadingAtStopLine {
@@ -173,7 +181,7 @@ int32_t main(int32_t argc, char **argv) {
          };
          od4.dataTrigger(opendlv::proxy::DistanceReading::ID(), onDistanceReadingAtStopLine);
 
-         // Function to move forward to approach the stop line
+         // start detecting other cars when approaching stop line
       	auto onCarOutOfSight {
             [&od4, VERBOSE, &leading_car_gone](cluon::data::Envelope &&envelope) {
 
@@ -540,9 +548,11 @@ void removeCarFromQueue( vector<Point> &initial_car_positions, int *cars_in_queu
       }
    }
 
-   *cars_in_queue -= 1;
-   *car_leave_timeout_counter = 4; // new car must wait 4 seconds before leaving
-   cout << "            [ TIMEOUT ON ] " << *car_leave_timeout_counter << endl;
+   if (*cars_in_queue > 0) {
+      *cars_in_queue -= 1;
+      *car_leave_timeout_counter = 4; // new car must wait 4 seconds before leaving
+      cout << "            [ TIMEOUT ON ] " << *car_leave_timeout_counter << endl;
+   }
 }
 
 void checkCarPosition( OD4Session *od4,
