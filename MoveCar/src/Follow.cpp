@@ -245,6 +245,7 @@ int32_t main(int32_t argc, char **argv) {
 				std::cout << "Car out of sight! Approach the stop line until stop sign is out of sight! " << std::endl;
 			}
 
+			SetSteering(od4, 0.0, VERBOSE);		
 			MoveForward(od4, STARTSPEED, VERBOSE);
 		}
 	}};
