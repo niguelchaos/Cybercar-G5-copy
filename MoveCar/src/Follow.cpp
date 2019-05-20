@@ -144,7 +144,7 @@ int32_t main(int32_t argc, char **argv) {
 
 		const float MAXSTEER{(commandlineArguments["maxsteer"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["maxsteer"])) : static_cast<float>(0.4)};
 		const float MINSTEER{(commandlineArguments["minsteer"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["minsteer"])) : static_cast<float>(-0.4)};
-		const float SAFETYDISTANCE{(commandlineArguments["safetyDistance"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["safetyDistance"])) : static_cast<float>(0.01)};
+		const float SAFETYDISTANCE{(commandlineArguments["safetyDistance"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["safetyDistance"])) : static_cast<float>(0.15)};
 
       // A Data-triggered function to detect front obstacle and stop or move car accordingly
       float currentDistance{0.0};
@@ -161,7 +161,7 @@ int32_t main(int32_t argc, char **argv) {
 	            // std::cout << "Received DistanceReading message (senderStamp=" << senderStamp << "): " << currentDistance << std::endl;
 	        	}
 				if (currentDistance <= SAFETYDISTANCE) {
-				StopCar(od4, VERBOSE); // Stop the car if obstacle is too close
+				MoveForward(od4, 0.0, VERBOSE); // Stop the car if obstacle is too close
 				currentCarSpeed = 0.0;
 				currentSteering = 0.0; // reset wheels too just in case
 				SetSteering(od4, currentSteering, VERBOSE);
