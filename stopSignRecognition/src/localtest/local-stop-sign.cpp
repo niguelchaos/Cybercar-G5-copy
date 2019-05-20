@@ -32,11 +32,11 @@ using namespace cluon;
 String stopSignCascadeName;
 CascadeClassifier stopSignCascade;
 //Defining variables for stop sign
-String carsCascadeName;
-CascadeClassifier carsCascadeClassifier;
+//String carsCascadeName;
+//CascadeClassifier carsCascadeClassifier;
 
 bool stopSignPresent = false;
-const int lookBackNoOfFrames = 20;
+const int lookBackNoOfFrames = 8;
 int NO_OF_STOPSIGNS_REQUIRED = 5;
 int currentIndex = 0;
 bool seenFrameStopsigns[lookBackNoOfFrames] = {false};
@@ -60,15 +60,6 @@ int main(int argc, char** argv) {
    Mat frame_gray;
    Mat cropped_frame;
 
-/*
-   // Interface to a running OpenDaVINCI session; here, you can send and receive messages.
-   static cluon::OD4Session od4(123,
-     [](cluon::data::Envelope &&envelope) noexcept {
-     if (envelope.dataType() == 2000) {
-        HelloWorld receivedHello = cluon::extractMessage<HelloWorld>(std::move(envelope));
-        std::cout << receivedHello.helloworld() << std::endl;
-     }
-   });*/
 
    //Loading the haar cascade
    //"../stopSignClassifier.xml" because the build file is in another folder, necessary to build for testing
@@ -155,11 +146,11 @@ void detectAndDisplayStopSign( Mat frame)
             //Draw a circle when recognized
             ellipse( frame, center, Size( stopsigns[i].width/2, stopsigns[i].height/2 ), 0, 0, 360, Scalar( 0, 0, 255 ), 4, 8, 0 );
             Mat faceROI = frame_gray( stopsigns[i] );
-            stopSignArea += stopsigns[i].width * stopsigns[i].height;
+            stopSignArea = stopsigns[i].width * stopsigns[i].height;
         }
 
         //It compares the previous state with the current one and it reports it if there is a change of state
-            bool valueToReport = insertCurrentFrameStopSign(stopSignArea > 200);
+            bool valueToReport = insertCurrentFrameStopSign(stopSignArea > 3500);
             if(stopSignPresent != valueToReport){
                 stopSignPresent = valueToReport;
                 stopSignPresenceUpdate.stopSignPresence(valueToReport);
@@ -167,8 +158,9 @@ void detectAndDisplayStopSign( Mat frame)
                     std::cout << "sending stop sign detected message: " << std::endl;
                 } else {
                     std::cout << "sending NO stop sign present message: " << std::endl;
+                     // od4->send(stopSignPresenceUpdate);
                 }
-               // od4->send(stopSignPresenceUpdate);
+              
             }
     // -- Opens a new window with the Stop sign recognition on
     imshow( "stopSign", frame );
