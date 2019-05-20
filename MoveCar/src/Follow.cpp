@@ -62,9 +62,9 @@ void MoveForward(cluon::OD4Session& od4, float speed, bool VERBOSE)
 			// Inspired by: https://en.cppreference.com/w/cpp/chrono/system_clock/now and https://en.cppreference.com/w/cpp/chrono
 			auto now = std::chrono::system_clock::now();
 			std::chrono::duration<double> elapsed_seconds = now-lastTimeZeroSpeed; // Calculate the time the car stands still
-			if (elapsed_seconds.count() >= 5) {
+			if (elapsed_seconds.count() >= 7) {
 				standingStillForPeriodOfTime = true;
-	    			std::cout << "Not moving for 5 seconds. We are standing behind a car at the intersection. \n";
+	    			std::cout << "Not moving for 7 seconds. We are standing behind a car at the intersection. \n";
 			}
 		}
 
@@ -83,17 +83,39 @@ void SetSteering(cluon::OD4Session& od4, float steer, bool VERBOSE)
         }
 }
 
-void TurnLeft(cluon::OD4Session& od4, float steer, float speed, bool VERBOSE)
+void TurnLeft(cluon::OD4Session& od4, float steer, float speed, bool VERBOSE, int timer1, int timer2, int timer3)
 {
-	SetSteering(od4, steer, VERBOSE);
+	SetSteering(od4, 0.0, VERBOSE); //put wheels straight
 	MoveForward(od4, speed, VERBOSE);
+	std::this_thread::sleep_for(std::chrono::milliseconds(timer1));
+	SetSteering(od4, steer, VERBOSE);
+	std::this_thread::sleep_for(std::chrono::milliseconds(timer2));
+	SetSteering(od4, 0.0, VERBOSE);
+	std::this_thread::sleep_for(std::chrono::milliseconds(timer3));
+	StopCar(od4, VERBOSE);
 }
 
-void TurnRight(cluon::OD4Session& od4, float steer, float speed, bool VERBOSE)
+
+void TurnRight(cluon::OD4Session& od4, float steer, float speed, bool VERBOSE, int timer1, int timer2)
 {
+	steer = -steer; // GroundSteeringRequest received negative values for steering right. Argument steer must always be positive!
 	SetSteering(od4, steer, VERBOSE);
 	MoveForward(od4, speed, VERBOSE);
+	std::this_thread::sleep_for(std::chrono::milliseconds(timer1));
+	SetSteering(od4, 0.0, VERBOSE);
+	std::this_thread::sleep_for(std::chrono::milliseconds(timer2));
+	StopCar(od4, VERBOSE);
 }
+
+void GoStraight(cluon::OD4Session& od4, float speed, bool VERBOSE){
+
+	SetSteering(od4, 0.0, VERBOSE); 		
+	SetSpeed(od4, speed, VERBOSE);
+	std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+	StopCar(od4, VERBOSE);
+
+}
+
 
 int32_t main(int32_t argc, char **argv) {
 
@@ -182,50 +204,17 @@ int32_t main(int32_t argc, char **argv) {
 		    		std::cout << "Received Stop car message: " << std::endl;
 			}
 
-			if (stopSignPresence==true){
+			if (stopSignPresence==false){
 				//stopCarSent = true;
 				StopCar(od4, VERBOSE);
 			}
 
-
-			/*if (stopSignPresence==false){
-
-			MoveForward (od4, 0.13, VERBOSE);
-
-			}*/
 		//}
 	    }
         };
         od4.dataTrigger(StopSignPresenceUpdate::ID(), onStopCar);
 
-/*
-   auto onStopCar{[&od4, VERBOSE](cluon::data::Envelope &&envelope)
-            {
 
-		auto msg = cluon::extractMessage<StopSignPresenceUpdate>(std::move(envelope));
-		bool stopSignPresence = msg.stopSignPresence(); // Get the bool
-
-		if (standingStillForPeriodOfTime) { // Listen to stop sign message after car was still for period of time
-			if (VERBOSE)
-			{
-		    		std::cout << "Received Stop car message: " << std::endl;
-			}
-
-			if (stopCarSent == false && stopSignPresence==true){
-				stopCarSent = true;
-			}
-
-			if (stopCarSent == true && stopSignPresence==false){
-				MoveForward (od4, 0.13, VERBOSE);
-				std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-				StopCar(od4, VERBOSE);
-			}
-		}
-
-	    }
-        };
-        od4.dataTrigger(StopSignPresenceUpdate::ID(), onStopCar);
-*/
 
 // [Relative PID for speed correction]
 	auto onSpeedCorrection {
@@ -342,38 +331,42 @@ int32_t main(int32_t argc, char **argv) {
 				std::cout << "Car out of sight! Approach the stop line until stop sign is out of sight! " << std::endl;
 			}
 
+			SetSteering(od4, 0.0, VERBOSE);		
 			MoveForward(od4, STARTSPEED, VERBOSE);
 		}
 	}};
 	od4.dataTrigger(CarOutOfSight::ID(), onCarOutOfSight);
 
 
+		//Direction movments left /right /straight 
+	auto onChooseDirectionRequest{[&od4, MAXSTEER, VERBOSE](cluon::data::Envelope &&envelope)
+            {
+		auto msg = cluon::extractMessage<ChooseDirectionRequest>(std::move(envelope));
+		float direction = msg.direction(); // Get the amount
+
+			if (VERBOSE)
+			{
+		    		std::cout << "Received Direction message: " << std::endl;
+			}
+
+			if (direction == 1) {			
+			TurnRight(od4, MAXSTEER, 0.12, VERBOSE, 2000, 1500);
+			}
+
+			if (direction == 2) {
+			GoStraight (od4, 0.12, VERBOSE);
+			}
+			
+			else if (direction == 3) {
+			TurnLeft(od4, MAXSTEER, 0.12, VERBOSE, 1500, 2000, 2000);
+			}
+	    }
+        };
+        od4.dataTrigger(ChooseDirectionRequest::ID(), onChooseDirectionRequest);
+
+
         while(od4.isRunning()) {
-// only sends messages
-
-		/*HelloWorld helloWorld;
-		helloWorld.helloWorld("i HATE CAR");
-		od4.send(helloWorld);
-		if (VERBOSE) std::cout << "Hello World sent (i HATE CAR)" << std::endl;
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-
-		SpeedCorrectionRequest speedCorrection;
-		speedCorrection.amount(1);
-		od4.send(speedCorrection);
-
-		std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-
-		SteeringCorrectionRequest steeringCorrection;
-		steeringCorrection.amount(-1);
-		od4.send(steeringCorrection);
-
-
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-
-		StopSignPresenceUpdate stopSign;
-		stopSign.stopSignPresence(true);
-		od4.send(stopSign);*/
-
+		
 		}
 		return 0;
 	}
