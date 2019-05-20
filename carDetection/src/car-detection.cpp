@@ -249,20 +249,22 @@ int32_t main(int32_t argc, char **argv) {
             // Crop the frame to get useful stuff
             frame(Rect(Point(0, 0), Point(640, 370))).copyTo(cropped_frame);
 
-            // auto brighten needs to be in BGR
-            // RGB > BGR (brighten frame) > HSV (detect colors)
-            // cvtColor(cropped_frame, brightened_frame, COLOR_RGB2BGR);
-            // Automatically increase the brightness and contrast of the video.
-            BrightnessAndContrastAuto(cropped_frame, brightened_frame, 0.6f);
-            // Convert from BGR to HSV colorspace
-            cvtColor(brightened_frame, frame_HSV, COLOR_RGB2HSV);
-            // Detect the object based on HSV Range Values
-            inRange(frame_HSV, Scalar(low_H_pink, low_S_pink, low_V_pink), Scalar(high_H_pink, high_S_pink, high_V_pink), frame_threshold);
-
-            findSquares(frame_threshold, squares);
-            final_frame = drawSquares(frame_threshold, squares, boundRects, &od4);
-
+            // only start detecting cars when leading car is gone
             if (leading_car_gone == true) {
+               // auto brighten needs to be in BGR
+               // RGB > BGR (brighten frame) > HSV (detect colors)
+               // cvtColor(cropped_frame, brightened_frame, COLOR_RGB2BGR);
+               // Automatically increase the brightness and contrast of the video.
+               BrightnessAndContrastAuto(cropped_frame, brightened_frame, 0.6f);
+               // Convert from BGR to HSV colorspace
+               cvtColor(brightened_frame, frame_HSV, COLOR_RGB2HSV);
+               // Detect the object based on HSV Range Values
+               inRange(frame_HSV, Scalar(low_H_pink, low_S_pink, low_V_pink), Scalar(high_H_pink, high_S_pink, high_V_pink), frame_threshold);
+
+               findSquares(frame_threshold, squares);
+               final_frame = drawSquares(frame_threshold, squares, boundRects, &od4);
+
+
                if (yeet_sent == false) {
                   detectCars(&od4, final_frame, squares, boundRects, &prev_area, &prev_centerX, &prev_centerY,
                      &cars_in_queue, &car_leave_timeout_counter, &stop_line_arrived, &stop_line_arrived_trigger,
