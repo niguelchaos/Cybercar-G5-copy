@@ -54,11 +54,11 @@ void MoveForward(cluon::OD4Session& od4, float speed, bool VERBOSE)
 {
 	SetSpeed(od4, speed, VERBOSE);
 	// if (VERBOSE) std::cout << "Now move forward ... " << std::endl;
-	
+
 	if (standingStillForPeriodOfTime == false) { // The car was never still for a period of time
-		if (previousSpeed != 0.0 && speed == 0.0) { 
+		if (previousSpeed != 0.0 && speed == 0.0) {
 			lastTimeZeroSpeed = std::chrono::system_clock::now(); // Take time stamp when car stopped
-		} else if (previousSpeed == 0.0 && speed == 0.0) { 
+		} else if (previousSpeed == 0.0 && speed == 0.0) {
 			// Inspired by: https://en.cppreference.com/w/cpp/chrono/system_clock/now and https://en.cppreference.com/w/cpp/chrono
 			auto now = std::chrono::system_clock::now();
 			std::chrono::duration<double> elapsed_seconds = now-lastTimeZeroSpeed; // Calculate the time the car stands still
@@ -143,8 +143,11 @@ int32_t main(int32_t argc, char **argv) {
 	            // std::cout << "Received DistanceReading message (senderStamp=" << senderStamp << "): " << currentDistance << std::endl;
 	        	}
 				if (currentDistance <= SAFETYDISTANCE) {
-				StopCar(od4, VERBOSE); // Stop the car if obstacle is too close
+				// Stop the car if obstacle is too close
+				// StopCar(od4, VERBOSE);
+				// move forward is used because it counts time.
 				currentCarSpeed = 0.0;
+				MoveForward(od4, currentCarSpeed, VERBOSE);
 
 				if (currentSteering < -0.2) { // steering right
 					currentSteering = currentSteering - (currentSteering / 3); // turn to the left quickly
@@ -198,10 +201,10 @@ int32_t main(int32_t argc, char **argv) {
 /*
    auto onStopCar{[&od4, VERBOSE](cluon::data::Envelope &&envelope)
             {
-		
+
 		auto msg = cluon::extractMessage<StopSignPresenceUpdate>(std::move(envelope));
 		bool stopSignPresence = msg.stopSignPresence(); // Get the bool
-		
+
 		if (standingStillForPeriodOfTime) { // Listen to stop sign message after car was still for period of time
 			if (VERBOSE)
 			{
@@ -218,7 +221,7 @@ int32_t main(int32_t argc, char **argv) {
 				StopCar(od4, VERBOSE);
 			}
 		}
-	
+
 	    }
         };
         od4.dataTrigger(StopSignPresenceUpdate::ID(), onStopCar);
@@ -226,7 +229,7 @@ int32_t main(int32_t argc, char **argv) {
 
 // [Relative PID for speed correction]
 	auto onSpeedCorrection {
-	    [&od4, VERBOSE, STARTSPEED, MAXSPEED, LOSTVISUAL, DECELERATE, &safety_dist_triggered](cluon::data::Envelope &&envelope) 
+	    [&od4, VERBOSE, STARTSPEED, MAXSPEED, LOSTVISUAL, DECELERATE, &safety_dist_triggered](cluon::data::Envelope &&envelope)
 	{
     	if (safety_dist_triggered == false) {
 		    if (!standingStillForPeriodOfTime) { // Don't listen corrections if car was still for period of time
@@ -325,14 +328,14 @@ int32_t main(int32_t argc, char **argv) {
 // triggers - ordering is probably important
        od4.dataTrigger(SteeringCorrectionRequest::ID(), onSteeringCorrection); //check steering correction first
 	    od4.dataTrigger(SpeedCorrectionRequest::ID(), onSpeedCorrection);
-	
+
 
 
 	// Function to move forward to approach the stop line
 	auto onCarOutOfSight{[&od4, VERBOSE, STARTSPEED ](cluon::data::Envelope &&envelope)
 	{
 		auto msg = cluon::extractMessage<CarOutOfSight>(std::move(envelope));
-	  	
+
 		if (standingStillForPeriodOfTime == true) {
 			if (VERBOSE)
 			{
@@ -342,7 +345,7 @@ int32_t main(int32_t argc, char **argv) {
 			MoveForward(od4, STARTSPEED, VERBOSE);
 		}
 	}};
-	od4.dataTrigger(CarOutOfSight::ID(), onCarOutOfSight); 
+	od4.dataTrigger(CarOutOfSight::ID(), onCarOutOfSight);
 
 
         while(od4.isRunning()) {
@@ -369,8 +372,8 @@ int32_t main(int32_t argc, char **argv) {
 
 		StopSignPresenceUpdate stopSign;
 		stopSign.stopSignPresence(true);
-		od4.send(stopSign);*/	
-		
+		od4.send(stopSign);*/
+
 		}
 		return 0;
 	}
