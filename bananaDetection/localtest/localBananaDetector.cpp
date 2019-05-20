@@ -29,17 +29,17 @@ using namespace std;
 using namespace cluon;
 
 
-void detectAndDisplayCars( Mat frame);
+void detectAndDisplayBananas( Mat frame);
 
 //defining variables for stop sign
-String carsCascadeName;
-CascadeClassifier carsCascadeClassifier;
+String bananaCascadeName;
+CascadeClassifier bananaCascadeClassifier;
 
-bool carPresent = false;
-const int lookBackNoOfFrames = 20;
-int NO_OF_CARS_REQUIRED = 5;
+bool bananaPresent = false;
+const int lookBackNoOfFrames = 8;
+int NO_OF_BANANAS_REQUIRED = 5;
 int currentIndex = 0;
-bool seenFrameCar[lookBackNoOfFrames] = {false};
+bool seenFrameBanana[lookBackNoOfFrames] = {false};
 
 static void help(const char* programName)
 {
@@ -62,8 +62,8 @@ int main(int argc, char** argv) {
    //"../cars.xml" because the build file is in another folder, necessary to build for testing
    //classifier trained by ourseves using this youtube tutorial as guidance https://www.youtube.com/watch?time_continue=203&v=WEzm7L5zoZE
    //The pictures taken for the classifier where from: https://github.com/chalmers-revere/opendlv-kiwi-data/tree/master/kiwi_detection
-   carsCascadeName = "../cars.xml";
-   if(!carsCascadeClassifier.load(carsCascadeName)){printf("--(!)Error loading stopsign cascade\n"); return -1; };
+   bananaCascadeName = "../bananas.xml";
+   if(!bananaCascadeClassifier.load(bananaCascadeName)){printf("--(!)Error loading stopsign cascade\n"); return -1; };
 
    // Capture the video stream from default or supplied capturing device.
    VideoCapture cap(argc > 1 ? atoi(argv[1]) : 0);
@@ -78,7 +78,7 @@ int main(int argc, char** argv) {
      }
 
 // Method for detecting stop sign with haar cascade
-     detectAndDisplayCars(frame);
+     detectAndDisplayBananas(frame);
 
      //Method for detecting cars
     // detectAndDisplayCars(frame);
@@ -92,23 +92,23 @@ int main(int argc, char** argv) {
 }
 
 
-bool insertCurrentFrameCar(bool carCurrentFrame) {
+bool insertCurrentFrameBanana(bool bananaCurrentFrame) {
 
-        seenFrameCar[currentIndex] = carCurrentFrame;
+        seenFrameBanana[currentIndex] = bananaCurrentFrame;
         currentIndex++;
         if(currentIndex >= lookBackNoOfFrames) {
             //Because we don't wanna go outside of the array.
             currentIndex = 0;
         }
         
-        int noOfFramesWithCars = 0; 
+        int noOfFramesWithBanana = 0; 
         //Loop over the array and collect all the trues.
         for(int i = 0; i < lookBackNoOfFrames; i++) {
-            if(seenFrameCar[i]) {
-                noOfFramesWithCars++;
+            if(seenFrameBanana[i]) {
+                noOfFramesWithBanana++;
             }
         }
-        if(noOfFramesWithCars < NO_OF_CARS_REQUIRED) {
+        if(noOfFramesWithBanana < NO_OF_BANANAS_REQUIRED) {
             return false;
         }
         else {
@@ -119,41 +119,42 @@ bool insertCurrentFrameCar(bool carCurrentFrame) {
 //Haar cascade for cars copied and modified from
 //https://docs.opencv.org/3.4.1/db/d28/tutorial_cascade_classifier.html
 
-void detectAndDisplayCars( Mat frame)
+void detectAndDisplayBananas( Mat frame)
 {
-    //Sending messages for car detection
-    CarPresenceUpdate carPresenceUpdate;
+    //Sending messages for banana detection
+    BananaPresenceUpdate bananaPresenceUpdate;
 
-    std::vector<Rect> cars;
+    std::vector<Rect> bananas;
     Mat frame_gray;
     cvtColor( frame, frame_gray, COLOR_BGR2GRAY );
     equalizeHist( frame_gray, frame_gray );
-    //-- Detect cars
-    carsCascadeClassifier.detectMultiScale(frame_gray, cars, 1.1, 2, 0|CASCADE_SCALE_IMAGE, Size(60, 60));
-    //checks if the car is present in the current frame
+    //-- Detect bananas
+    bananaCascadeClassifier.detectMultiScale(frame_gray, bananas, 1.1, 2, 0|CASCADE_SCALE_IMAGE, Size(60, 60));
+    //checks if the bananas is present in the current frame
     
-        float carArea = 0;
-        for (size_t i = 0; i < cars.size(); i++)
+        float bananaArea = 0;
+        for (size_t i = 0; i < bananas.size(); i++)
         {
-            Point center( cars[i].x + cars[i].width/2, cars[i].y + cars[i].height/2 );
+            Point center( bananas[i].x + bananas[i].width/2, bananas[i].y + bananas[i].height/2 );
             //Draw a circle when recognized
-            ellipse( frame, center, Size( cars[i].width/2, cars[i].height/2 ), 0, 0, 360, Scalar( 0, 0, 255 ), 4, 8, 0 );
-            Mat faceROI = frame_gray( cars[i] );
-            carArea += cars[i].width * cars[i].height;
+            ellipse( frame, center, Size( bananas[i].width/2, bananas[i].height/2 ), 0, 0, 360, Scalar( 0, 0, 255 ), 4, 8, 0 );
+            Mat faceROI = frame_gray( bananas[i] );
+            bananaArea = bananas[i].width * bananas[i].height;
         }
 
         //It compares the previous state with the current one and it reports it if there is a change of state
-            bool valueToReport = insertCurrentFrameCar(carArea > 200);
-            if(carPresent != valueToReport){
-                carPresent = valueToReport;
-                carPresenceUpdate.carPresence(valueToReport);
+            bool valueToReport = insertCurrentFrameBanana(bananaArea > 4000);
+            if(bananaPresent != valueToReport){
+                bananaPresent = valueToReport;
+                bananaPresenceUpdate.bananaPresence(valueToReport);
                 if(valueToReport) {
-                    std::cout << "Car detected " << std::endl;
+                    std::cout << "There is a banana, Don't turn right! " << std::endl;
+                    //od4->send(carPresenceUpdate);
                 } else {
-                    std::cout << "There are NO cars " << std::endl;
+                    std::cout << "There are NO bananas anymore " << std::endl;
                 }
-                //od4->send(carPresenceUpdate);
+                // maybe say something here like "no bananas are being seen yet!
             }
-    // -- Opens a new window with the car recognition on
-    imshow( "cars", frame );
+    // -- Opens a new window with the banana recognition on
+    imshow( "bananas", frame );
 }

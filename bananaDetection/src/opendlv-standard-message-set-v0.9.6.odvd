@@ -375,8 +375,16 @@ message opendlv.logic.cognition.GroundSteeringLimit [id = 1191] {
 message opendlv.logic.cognition.GroundSpeedLimit [id = 1192] {
   float speedLimit [id = 1];
 }
+
+message StopSignPresenceUpdate[id = 2007]{
+   bool stopSignPresence [id = 1];
+}
+
+message BananaPresenceUpdate [id = 2011] {
+    bool bananaPresence [id = 1];
+}
 /*
-message HelloWorld [id = 2000] {
+message Helloworld [id = 2000] {
    string helloworld [id = 1];
 }
 
@@ -386,16 +394,21 @@ message SpeedUp [id = 2001] {
 
 message SpeedDown [id = 2002] {
    float speed [id = 1];
+
 }
 
-message StopCarRequest[id = 2007]{
-    float stopRequest [id = 1];
-}
-*/
-message StopSignPresenceUpdate[id = 2010]{
-   bool stopSignPresence [id = 1];
+message MoveRight [id = 2003] {
+   float angle [id = 1];
 }
 
-message CarPresenceUpdate [id = 2011] {
-    bool carPresence [id = 1];
+message MoveLeft [id = 2004] {
+   float angle [id = 1];
 }
+
+message SteeringCorrectionRequest [id = 2005] {
+   float amount [id = 1];
+}
+
+message SpeedCorrectionRequest [id = 2006] {
+   float amount [id = 1];
+}*/

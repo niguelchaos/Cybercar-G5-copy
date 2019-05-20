@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.2)
 
-project(localCarObject)
+project(localBananaDetector)
 
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Werror -Wno-error=maybe-uninitialized -Wno-error=unused-variable")
