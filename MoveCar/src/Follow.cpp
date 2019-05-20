@@ -62,9 +62,9 @@ void MoveForward(cluon::OD4Session& od4, float speed, bool VERBOSE)
 			// Inspired by: https://en.cppreference.com/w/cpp/chrono/system_clock/now and https://en.cppreference.com/w/cpp/chrono
 			auto now = std::chrono::system_clock::now();
 			std::chrono::duration<double> elapsed_seconds = now-lastTimeZeroSpeed; // Calculate the time the car stands still
-			if (elapsed_seconds.count() >= 5) {
+			if (elapsed_seconds.count() >= 7) {
 				standingStillForPeriodOfTime = true;
-	    			std::cout << "Not moving for 5 seconds. We are standing behind a car at the intersection. \n";
+	    			std::cout << "Not moving for 7 seconds. We are standing behind a car at the intersection. \n";
 			}
 		}
 
@@ -163,50 +163,17 @@ int32_t main(int32_t argc, char **argv) {
 		    		std::cout << "Received Stop car message: " << std::endl;
 			}
 
-			if (stopSignPresence==true){
+			if (stopSignPresence==false){
 				//stopCarSent = true;
 				StopCar(od4, VERBOSE);
 			}
 
-
-			/*if (stopSignPresence==false){
-			
-			MoveForward (od4, 0.13, VERBOSE);
-			
-			}*/
 		//}
 	    }
         };
         od4.dataTrigger(StopSignPresenceUpdate::ID(), onStopCar);
 
-/*
-   auto onStopCar{[&od4, VERBOSE](cluon::data::Envelope &&envelope)
-            {
-		
-		auto msg = cluon::extractMessage<StopSignPresenceUpdate>(std::move(envelope));
-		bool stopSignPresence = msg.stopSignPresence(); // Get the bool
-		
-		if (standingStillForPeriodOfTime) { // Listen to stop sign message after car was still for period of time
-			if (VERBOSE)
-			{
-		    		std::cout << "Received Stop car message: " << std::endl;
-			}
 
-			if (stopCarSent == false && stopSignPresence==true){
-				stopCarSent = true;
-			}
-
-			if (stopCarSent == true && stopSignPresence==false){
-				MoveForward (od4, 0.13, VERBOSE);
-				std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-				StopCar(od4, VERBOSE);
-			}
-		}
-	
-	    }
-        };
-        od4.dataTrigger(StopSignPresenceUpdate::ID(), onStopCar);
-*/
 
 // [Relative PID for speed correction]
 	auto onSpeedCorrection{[&od4, VERBOSE, STARTSPEED, MAXSPEED](cluon::data::Envelope &&envelope)
@@ -278,6 +245,7 @@ int32_t main(int32_t argc, char **argv) {
 				std::cout << "Car out of sight! Approach the stop line until stop sign is out of sight! " << std::endl;
 			}
 
+			SetSteering(od4, 0.0, VERBOSE);		
 			MoveForward(od4, STARTSPEED, VERBOSE);
 		}
 	}};
@@ -285,30 +253,6 @@ int32_t main(int32_t argc, char **argv) {
 
 
         while(od4.isRunning()) {
-// only sends messages
-
-		/*HelloWorld helloWorld;
-		helloWorld.helloWorld("i HATE CAR");
-		od4.send(helloWorld);
-		if (VERBOSE) std::cout << "Hello World sent (i HATE CAR)" << std::endl;
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-
-		SpeedCorrectionRequest speedCorrection;
-		speedCorrection.amount(1);
-		od4.send(speedCorrection);
-
-		std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-
-		SteeringCorrectionRequest steeringCorrection;
-		steeringCorrection.amount(-1);
-		od4.send(steeringCorrection);
-
-
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-
-		StopSignPresenceUpdate stopSign;
-		stopSign.stopSignPresence(true);
-		od4.send(stopSign);*/	
 		
 		}
 		return 0;
