@@ -106,6 +106,23 @@ int32_t main(int32_t argc, char **argv) {
          int lost_visual_frame_counter = 0; // needs 3 frames to trigger 1 lost_visual_sec_count
          int lost_visual_sec_count = 0;
          bool sent_lost_visual = false;
+
+         bool stop_line_arrived = false;
+
+         auto onStopCar {
+            [&od4, &stop_line_arrived]
+            (cluon::data::Envelope &&envelope) {
+
+               auto msg = cluon::extractMessage<StopSignPresenceUpdate>(std::move(envelope));
+               bool stopSignPresence = msg.stopSignPresence(); // Get the bool
+               if (stopSignPresence == false) {
+                  cout << "We have arrived at the stop line. " << endl;
+      				stop_line_arrived = true;
+               }
+            }
+         };
+         od4.dataTrigger(StopSignPresenceUpdate::ID(), onStopCar);
+
          // Endless loop; end the program by pressing Ctrl-C.
          while (od4.isRunning()) {
             Mat frame;
@@ -154,26 +171,28 @@ int32_t main(int32_t argc, char **argv) {
             // Crop the frame to get useful stuff
             frame(Rect(Point(0, 0), Point(640, 370))).copyTo(cropped_frame);
 
-      ///////////////////////// auto brightness /////////////////////
-            // Automatically increase the brightness and contrast of the video.
-            BrightnessAndContrastAuto(cropped_frame, brightened_frame, 0.6f);
-            // Convert from BGR to HSV colorspace
-            cvtColor(brightened_frame, frame_HSV, COLOR_RGB2HSV);
-            //==//////////////////////////////////////////////////////==//
+            // only follow a car when we have not arrived at the line
+            if (stop_line_arrived == false) {
+               //////////////////// auto brightness /////////////////////
+               // Automatically increase the brightness and contrast of the video.
+               BrightnessAndContrastAuto(cropped_frame, brightened_frame, 0.6f);
+               // Convert from BGR to HSV colorspace
+               cvtColor(brightened_frame, frame_HSV, COLOR_RGB2HSV);
+               //==//////////////////////////////////////////////////////==//
 
-            ////////////// no auto brightness ////////////////////
-            // cvtColor(cropped_frame, frame_HSV, COLOR_RGB2HSV);
-            ////////////////////////////////////////////////
+               ////////////// no auto brightness ////////////////////
+               // cvtColor(cropped_frame, frame_HSV, COLOR_RGB2HSV);
+               ////////////////////////////////////////////////
 
-            // Detect the object based on HSV Range Values
-            inRange(frame_HSV, Scalar(low_H_pink, low_S_pink, low_V_pink), Scalar(high_H_pink, high_S_pink, high_V_pink), frame_threshold_pink);
+               // Detect the object based on HSV Range Values
+               inRange(frame_HSV, Scalar(low_H_pink, low_S_pink, low_V_pink), Scalar(high_H_pink, high_S_pink, high_V_pink), frame_threshold_pink);
 
-            findSquares(frame_threshold_pink, pinkSquares);
+               findSquares(frame_threshold_pink, pinkSquares);
+               finalFramePink = drawSquares(frame_threshold_pink, pinkSquares, &od4, &prev_area, &lost_visual_frame_counter, &sent_lost_visual); // pass reference of prev_area
 
-            finalFramePink = drawSquares(frame_threshold_pink, pinkSquares, &od4, &prev_area, &lost_visual_frame_counter, &sent_lost_visual); // pass reference of prev_area
-
-            // findSquares(frame_threshold_green, greenSquares);
-            // finalFrameGreen = drawSquares(frame_threshold_green, greenSquares, 0, &od4);
+               // findSquares(frame_threshold_green, greenSquares);
+               // finalFrameGreen = drawSquares(frame_threshold_green, greenSquares, 0, &od4);
+            }
 
              // Display image. For testing recordings only.
             if (VERBOSE) {
@@ -187,7 +206,8 @@ int32_t main(int32_t argc, char **argv) {
             // measures FPS
             framecounter++;
             if (timestampsecs > prevtimestampsecs) {
-               // framecounter > 2 reduces accidental increases due to startup of image
+               // framecounter > 1 reduces accidental increases due to startup of image
+               // minimum frames changed to 2 because everything slower when running
                // only send message once
                if (lost_visual_frame_counter == 3 && framecounter > 1 && sent_lost_visual == false) {
                   stopLineLostVisual(&od4, &lost_visual_sec_count, &sent_lost_visual);
@@ -427,8 +447,8 @@ static Mat drawSquares(
         *lost_visual_frame_counter += 1;
       }
 
-      cout << "      counter: " << *lost_visual_frame_counter;
-      cout << "      | Lost Visual | " << endl;
+      cout << "   counter: " << *lost_visual_frame_counter;
+      cout << "   | Lost Visual | " << endl;
    }
 
    // if no bounding boxes, for loop is not entered because "i < boundrects.size" is -1
@@ -454,7 +474,7 @@ static Mat drawSquares(
 
      if (rect_area > 50000) { // for testing
         *sent_lost_visual = false;
-        cout << "         << Lost Visual Message Reset. >> " << endl;
+        cout << "         << Lost Visual MESSAGE RESET. >> " << endl;
      }
 
      *prev_area = rect_area; // remember this frame's area for the next frame
@@ -555,7 +575,7 @@ void BrightnessAndContrastAuto(const cv::Mat &src, cv::Mat &dst, float clipHistP
     // maxgray is always 255 as well, and mingray is always 0 in the end.
     alpha = (histSize - 1) / inputRange;   // alpha expands current range to histsize range
     beta = (float)-minGray * (float)alpha;  // beta shifts current range so that minGray will go to 0
-    cout << " Added Contrast: " << alpha << "   || " << " Added Brightness: " << beta << endl;
+    // cout << " Added Contrast: " << alpha << "   || " << " Added Brightness: " << beta << endl;
 
     // does the actual brightening.
     // Apply brightness and contrast normalization
