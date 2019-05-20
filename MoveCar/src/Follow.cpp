@@ -83,17 +83,39 @@ void SetSteering(cluon::OD4Session& od4, float steer, bool VERBOSE)
         }
 }
 
-void TurnLeft(cluon::OD4Session& od4, float steer, float speed, bool VERBOSE)
+void TurnLeft(cluon::OD4Session& od4, float steer, float speed, bool VERBOSE, int timer1, int timer2, int timer3)
 {
-	SetSteering(od4, steer, VERBOSE);
+	SetSteering(od4, 0.0, VERBOSE); //put wheels straight
 	MoveForward(od4, speed, VERBOSE);
+	std::this_thread::sleep_for(std::chrono::milliseconds(timer1));
+	SetSteering(od4, steer, VERBOSE);
+	std::this_thread::sleep_for(std::chrono::milliseconds(timer2));
+	SetSteering(od4, 0.0, VERBOSE);
+	std::this_thread::sleep_for(std::chrono::milliseconds(timer3));
+	StopCar(od4, VERBOSE);
 }
 
-void TurnRight(cluon::OD4Session& od4, float steer, float speed, bool VERBOSE)
+
+void TurnRight(cluon::OD4Session& od4, float steer, float speed, bool VERBOSE, int timer1, int timer2)
 {
+	steer = -steer; // GroundSteeringRequest received negative values for steering right. Argument steer must always be positive!
 	SetSteering(od4, steer, VERBOSE);
 	MoveForward(od4, speed, VERBOSE);
+	std::this_thread::sleep_for(std::chrono::milliseconds(timer1));
+	SetSteering(od4, 0.0, VERBOSE);
+	std::this_thread::sleep_for(std::chrono::milliseconds(timer2));
+	StopCar(od4, VERBOSE);
 }
+
+void GoStraight(cluon::OD4Session& od4, float speed, bool VERBOSE){
+
+	SetSteering(od4, 0.0, VERBOSE); 		
+	SetSpeed(od4, speed, VERBOSE);
+	std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+	StopCar(od4, VERBOSE);
+
+}
+
 
 int32_t main(int32_t argc, char **argv) {
 
@@ -250,6 +272,33 @@ int32_t main(int32_t argc, char **argv) {
 		}
 	}};
 	od4.dataTrigger(CarOutOfSight::ID(), onCarOutOfSight); 
+
+
+		//Direction movments left /right /straight 
+	auto onChooseDirectionRequest{[&od4, MAXSTEER, VERBOSE](cluon::data::Envelope &&envelope)
+            {
+		auto msg = cluon::extractMessage<ChooseDirectionRequest>(std::move(envelope));
+		float direction = msg.direction(); // Get the amount
+
+			if (VERBOSE)
+			{
+		    		std::cout << "Received Direction message: " << std::endl;
+			}
+
+			if (direction == 1) {			
+			TurnRight(od4, MAXSTEER, 0.12, VERBOSE, 2000, 1500);
+			}
+
+			if (direction == 2) {
+			GoStraight (od4, 0.12, VERBOSE);
+			}
+			
+			else if (direction == 3) {
+			TurnLeft(od4, MAXSTEER, 0.12, VERBOSE, 1500, 2000, 2000);
+			}
+	    }
+        };
+        od4.dataTrigger(ChooseDirectionRequest::ID(), onChooseDirectionRequest);
 
 
         while(od4.isRunning()) {
