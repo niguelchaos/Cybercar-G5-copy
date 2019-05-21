@@ -31,6 +31,9 @@ using namespace cluon;
 
 
 int32_t main(int32_t argc, char **argv) {
+
+	bool trafficSignPresence = false;	
+	
 	// Parse the arguments from the command line
 	auto commandlineArguments = cluon::getCommandlineArguments(argc, argv);
 
@@ -53,20 +56,29 @@ int32_t main(int32_t argc, char **argv) {
 
 	
 	//Safe to go - choose direction
-	auto onSafeToGo{[&od4, VERBOSE](cluon::data::Envelope &&envelope)
+	auto onSafeToGo{[&od4, &trafficSignPresence, VERBOSE](cluon::data::Envelope &&envelope)
 	    {
 		auto msg = cluon::extractMessage<SafeToGo>(std::move(envelope));
 		char input = '0';
 
 		std::cout << "Please enter direction for kiwi car. " << std::endl << 
 			    "Enter 1 for turn right, 2 for going straight and 3 for turning left: " << std::endl;
-		std::cin >> input;
 
-		while(input != '1' && input != '2' && input != '3') //check for invalid input
-		{
-			std::cout << "Invalid input! Please try again.";				
+		bool validInput = false;
+
+		do
+		{					
 			std::cin >> input;
-		}
+			
+			if(input == '1' && trafficSignPresence == true){ //global variable carying value of the messsage for traffic sign 	
+				std::cout << "It is forbiden to turnright! Please try again." << std::endl; 
+				
+			} else if (input != '1' && input != '2' && input != '3') {   //check for valid input
+				std::cout << "Invalid input! Please try again." << std::endl;
+			} else {
+				validInput = true;
+			}
+		} while(validInput == false); 
 
 		int option = 0; 
 		if (input == '1') option = 1; //maping input value to integer that will be sent via message
@@ -80,11 +92,33 @@ int32_t main(int32_t argc, char **argv) {
 	    }
 	};
 	od4.dataTrigger(SafeToGo::ID(), onSafeToGo);
+
+	
+	auto onNorasMessage{[&od4, &trafficSignPresence, VERBOSE](cluon::data::Envelope &&envelope)
+	    {
+		auto msg = cluon::extractMessage<NorasMessage>(std::move(envelope));
+		bool norasVariable = msg.norasVariable();
+		
+		if (VERBOSE) {
+			std::cout << "Received Noras message " << norasVariable << std::endl;		
+		}		
+
+		if (norasVariable == true){
+	
+			trafficSignPresence = true;
+			}
+
+		
+	    }
+	};
+	od4.dataTrigger(NorasMessage::ID(), onNorasMessage);
  
 
 
 	while(od4.isRunning()) {
-	}
+
+
+}
 
 	return 0;
 }
