@@ -55,7 +55,7 @@ int32_t main(int32_t argc, char **argv) {
 	//Safe to go - choose direction
 	auto onSafeToGo{[&od4, VERBOSE](cluon::data::Envelope &&envelope)
 	    {
-		auto msg = cluon::extractMessage<StopSignPresenceUpdate>(std::move(envelope));
+		auto msg = cluon::extractMessage<SafeToGo>(std::move(envelope));
 		char input = '0';
 
 		std::cout << "Please enter direction for kiwi car. " << std::endl << 
