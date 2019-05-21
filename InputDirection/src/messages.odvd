@@ -403,6 +403,12 @@ message ChooseDirectionRequest [id=2008] {
 	
 }
 
+
+message YieldPresenceUpdate [id = 2009] {
+   bool yieldPresence [id = 1];
+}
+
+
 message StopSignPresenceUpdate[id = 2010]{
    bool stopSignPresence [id = 1];
 }
