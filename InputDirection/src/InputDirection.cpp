@@ -94,16 +94,16 @@ int32_t main(int32_t argc, char **argv) {
 	od4.dataTrigger(SafeToGo::ID(), onSafeToGo);
 
 	
-	auto onNorasMessage{[&od4, &trafficSignPresence, VERBOSE](cluon::data::Envelope &&envelope)
+	auto onYieldPresenceUpdate{[&od4, &trafficSignPresence, VERBOSE](cluon::data::Envelope &&envelope)
 	    {
-		auto msg = cluon::extractMessage<NorasMessage>(std::move(envelope));
-		bool norasVariable = msg.norasVariable();
+		auto msg = cluon::extractMessage<YieldPresenceUpdate>(std::move(envelope));
+		bool yieldPresence = msg.yieldPresence();
 		
 		if (VERBOSE) {
-			std::cout << "Received Noras message " << norasVariable << std::endl;		
+			std::cout << "Received Yield message " << yieldPresence << std::endl;		
 		}		
 
-		if (norasVariable == true){
+		if (yieldPresence == true){
 	
 			trafficSignPresence = true;
 			}
@@ -111,7 +111,7 @@ int32_t main(int32_t argc, char **argv) {
 		
 	    }
 	};
-	od4.dataTrigger(NorasMessage::ID(), onNorasMessage);
+	od4.dataTrigger(YieldPresenceUpdate::ID(), onYieldPresenceUpdate);
  
 
 
