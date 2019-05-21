@@ -1,3 +1,10 @@
+# Car Detection
+ - deals with detecting the cars on the intersection
+ - detecting when cars leave the Intersection
+ - notifying input when it is ok to leave the intersection.
+
+ The code uses a Haar cascade XML to detect other cars, which is graciously given by Group 8.
+
 ## To Deploy carDetection:
 
 * Step 1: Be on the carDetection/ directory. (Not in src)
