@@ -107,11 +107,11 @@ void TurnRight(cluon::OD4Session& od4, float steer, float speed, bool VERBOSE, i
 	StopCar(od4, VERBOSE);
 }
 
-void GoStraight(cluon::OD4Session& od4, float speed, bool VERBOSE){
+void GoStraight(cluon::OD4Session& od4, float speed, bool VERBOSE, int timer1){
 
 	SetSteering(od4, 0.0, VERBOSE); 		
 	SetSpeed(od4, speed, VERBOSE);
-	std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+	std::this_thread::sleep_for(std::chrono::milliseconds(timer1));
 	StopCar(od4, VERBOSE);
 
 }
@@ -286,15 +286,15 @@ int32_t main(int32_t argc, char **argv) {
 			}
 
 			if (direction == 1) {			
-			TurnRight(od4, MAXSTEER, 0.12, VERBOSE, 2000, 1500);
+			TurnRight(od4, MAXSTEER, 0.12, VERBOSE, 2100, 1500);
 			}
 
 			if (direction == 2) {
-			GoStraight (od4, 0.12, VERBOSE);
+			GoStraight (od4, 0.12, VERBOSE, 3000);
 			}
 			
 			else if (direction == 3) {
-			TurnLeft(od4, MAXSTEER, 0.12, VERBOSE, 1500, 2000, 2000);
+			TurnLeft(od4, MAXSTEER, 0.12, VERBOSE, 1400, 2000, 2000);
 			}
 	    }
         };
