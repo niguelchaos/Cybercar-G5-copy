@@ -104,7 +104,9 @@ int32_t main(int32_t argc, char **argv) {
          CascadeClassifier carsCascadeClassifier;
 
          // XML from Group 8. Permission Given by Group 8.
+         // == for local testing ==
          // carsCascadeName = "../src/car-28-stages.xml";
+
          carsCascadeName = "/usr/bin/car-28-stages.xml";
          if(!carsCascadeClassifier.load(carsCascadeName)) {
             printf("--(!)Error loading car cascade xml \n");
@@ -153,9 +155,10 @@ int32_t main(int32_t argc, char **argv) {
                auto msg = cluon::extractMessage<StopSignPresenceUpdate>(std::move(envelope));
                bool stopSignPresence = msg.stopSignPresence(); // Get the bool
                if (stopSignPresence == false) {
-                  cout << "We have arrived at the stop line. " << endl;
+                  cout << "We have arrived at the stop line, waiting 2 seconds. " << endl;
       				stop_line_arrived = true;
                   left_car_is_12oclock_car = true;
+                  this_thread::sleep_for(chrono::milliseconds(2000));
                }
             }
          };
@@ -197,9 +200,11 @@ int32_t main(int32_t argc, char **argv) {
       	auto onCarOutOfSight {
             [&od4, VERBOSE, &leading_car_gone](cluon::data::Envelope &&envelope) {
 
-      		auto msg = cluon::extractMessage<CarOutOfSight>(std::move(envelope));
-      		cout << "     [ Leading Car out of sight ]  " << endl;
-            leading_car_gone = true;
+      		   auto msg = cluon::extractMessage<CarOutOfSight>(std::move(envelope));
+               if (leading_car_gone == false) {
+                  cout << "     [ Leading Car out of sight ]  " << endl;
+                  leading_car_gone = true;
+               }
       		}
       	};
       	od4.dataTrigger(CarOutOfSight::ID(), onCarOutOfSight);
@@ -451,14 +456,15 @@ static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, vecto
 void findCars(Mat &frame, vector<Rect>& foundCars, CascadeClassifier carsCascadeClassifier) {
 
    Mat frame_gray;
+   int min_neighbors = 3;
    // int group_thresh = 1;
    // double merge_box_diff = 0.8;
 
    cvtColor(frame, frame_gray, COLOR_RGB2GRAY );
    equalizeHist(frame_gray, frame_gray);
-   carsCascadeClassifier.detectMultiScale(frame_gray, foundCars, 1.1, 3);
+   carsCascadeClassifier.detectMultiScale(frame_gray, foundCars, 1.1, min_neighbors);
 
-   cout << "Found cars: " << foundCars.size() << endl;
+   // cout << "Found cars: " << foundCars.size() << endl;
    // groupRectangles(foundCars, group_thresh, merge_box_diff);
    // cout << "Found merged cars: " << foundCars.size() << endl;
 }
@@ -683,10 +689,10 @@ void checkCarPosition( OD4Session *od4,
          if (centerX >= frame_center - left_offset && centerX < frame_center + right_offset) {
 
             if (centerX_diff < 0 && centerY_diff > 0) { // moving closer and towards the left
-               if (area > 1700) {                        // if car is getting bigger
+               if (area > 10000) {                        // if car is getting bigger
                   cout << "   / Car leaving Intersection, towards our lane or 9 o clock. /" << endl;
                   if (centerX < 220 && centerY > 230) {   // if very close to the bottom left of the frame
-                     cout << " <<< Car has left intersection at 9 o clock or towards our lane. <<<" << endl;
+                     cout << " </< Car has left intersection at 9 o clock or towards our lane. </<" << endl;
                      removeCarFromQueue(initial_car_positions, cars_in_queue, car_leave_timeout_counter);
                   }
                }
@@ -706,7 +712,7 @@ void checkCarPosition( OD4Session *od4,
             // if car is relatively going in a straight line horizontally and is moving left
             else if (centerX_diff < -0.5 && centerY_diff > -5 && centerY_diff < 5 ) {
                cout << "   < Car leaving Intersection, towards 9 o clock. < " << endl;
-               if (centerX < 100 && centerY > 150 && centerY <= 240) {
+               if (centerX < 180 && centerY > 150 && centerY <= 240) {
                   cout << "   <<< Car has left Intersection, towards 9 o clock. <<< " << endl;
                   removeCarFromQueue(initial_car_positions, cars_in_queue, car_leave_timeout_counter);
                }
@@ -717,7 +723,7 @@ void checkCarPosition( OD4Session *od4,
          if (centerX > frame_center + right_offset) {
             if (centerX_diff > 0.5 && centerY_diff > -5 && centerY_diff < 5) {
                cout << "    > Car leaving Intersection towards 3 o clock >" << endl;
-               if (centerX > 550) {
+               if (centerX > 510) {
                   cout << "   >> Car has left at 3 o clock >> " << endl;
                   removeCarFromQueue(initial_car_positions, cars_in_queue, car_leave_timeout_counter);
                }
