@@ -55,10 +55,10 @@ using namespace std;
 using namespace cv;
 using namespace cluon;
 
-static double angle( Point pt1, Point pt2, Point pt0 );
-static void findSquares( const Mat& image, vector<vector<Point> >& squares );
-static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, vector<Rect> &boundRects, OD4Session *od4);
-void findCars(Mat &frame, vector<Rect>& foundCars, OD4Session *od4, CascadeClassifier carsCascadeClassifier);
+// static double angle( Point pt1, Point pt2, Point pt0 );
+// static void findSquares( const Mat& image, vector<vector<Point> >& squares );
+// static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, vector<Rect> &boundRects, OD4Session *od4);
+void findCars(Mat &frame, vector<Rect>& foundCars, CascadeClassifier carsCascadeClassifier);
 
 void removeCarFromQueue( vector<Point> &initial_car_positions, int *cars_in_queue, int *car_leave_timeout_counter);
 void checkCarPosition(OD4Session *od4, double *prev_centerX, double *prev_centerY, double centerX, double centerY,
@@ -66,7 +66,7 @@ void checkCarPosition(OD4Session *od4, double *prev_centerX, double *prev_center
    vector<Point> &initial_car_positions, int *cars_in_queue, int *car_leave_timeout_counter);
 void countCars(Mat frame, vector<Point> &initial_car_positions , int *cars_in_queue, bool *stop_line_arrived);
 void detectCars(
-   OD4Session *od4, Mat& image, const vector<vector<Point> >& squares, vector<Rect> &boundRects,
+   OD4Session *od4, Mat& image, vector<Rect> &foundCars,
    double *prev_area, double *prev_centerX, double *prev_centerY,
    int *cars_in_queue, int *car_leave_timeout_counter, bool *stop_line_arrived, bool *stop_line_arrived_trigger,
    vector<Point> &initial_car_positions, bool *left_car_is_12oclock_car);
@@ -104,7 +104,8 @@ int32_t main(int32_t argc, char **argv) {
          CascadeClassifier carsCascadeClassifier;
 
          // XML from Group 8. Permission Given by Group 8.
-         carsCascadeName = "/usr/bin/cars-28-stages.xml";
+         // carsCascadeName = "../src/car-28-stages.xml";
+         carsCascadeName = "/usr/bin/car-28-stages.xml";
          if(!carsCascadeClassifier.load(carsCascadeName)) {
             printf("--(!)Error loading car cascade xml \n");
             return -1;
@@ -214,12 +215,12 @@ int32_t main(int32_t argc, char **argv) {
             Mat brightened_frame;
             Mat frame_threshold;
             Mat final_frame;
-            vector<vector<Point> > squares;
-            vector<Rect> boundRects;
+            // vector<vector<Point> > squares;
+            // vector<Rect> boundRects;
             vector<Rect> foundCars;
 
-            const int max_value_H = 360/2;
-            const int max_value = 255;
+            // const int max_value_H = 360/2;
+            // const int max_value = 255;
 
             // Wait for a notification of a new frame.
             sharedMemory->wait();
@@ -243,12 +244,12 @@ int32_t main(int32_t argc, char **argv) {
             int64_t timestampsecs = timestampmicro / 1000000;
 
          // Pink
-            int low_H_pink = 135;
-            int low_S_pink = 55;
-            int low_V_pink = 65;
-            int high_H_pink = max_value_H;
-            int high_S_pink = max_value;
-            int high_V_pink = max_value;
+            // int low_H_pink = 135;
+            // int low_S_pink = 55;
+            // int low_V_pink = 65;
+            // int high_H_pink = max_value_H;
+            // int high_S_pink = max_value;
+            // int high_V_pink = max_value;
 
          // Green
             // int low_H_green = 42;
@@ -262,8 +263,10 @@ int32_t main(int32_t argc, char **argv) {
             frame(Rect(Point(0, 0), Point(640, 370))).copyTo(cropped_frame);
 
             // only start detecting cars when leading car is gone
+
             if (leading_car_gone == true) {
                if (yeet_sent == false) {
+
                   // auto brighten needs to be in BGR
                   // RGB > BGR (brighten frame) > HSV (detect colors)
                   // cvtColor(cropped_frame, brightened_frame, COLOR_RGB2BGR);
@@ -277,13 +280,13 @@ int32_t main(int32_t argc, char **argv) {
 
 
                   // Method for detecting car with haar cascade
-                  findCars(cropped_frame, foundCars, &od4, carsCascadeClassifier);
+                  findCars(cropped_frame, foundCars, carsCascadeClassifier);
 
                   // findSquares(frame_threshold, squares);
                   // final_frame = drawSquares(frame_threshold, squares, boundRects, &od4);
 
                   // checks position and location of cars
-                  detectCars(&od4, final_frame, squares, boundRects, &prev_area, &prev_centerX, &prev_centerY,
+                  detectCars(&od4, final_frame, foundCars, &prev_area, &prev_centerX, &prev_centerY,
                      &cars_in_queue, &car_leave_timeout_counter, &stop_line_arrived, &stop_line_arrived_trigger,
                      initial_car_positions, &left_car_is_12oclock_car);
                }
@@ -426,7 +429,7 @@ static void findSquares( const Mat& image, vector<vector<Point> >& squares ) {
 }
 
 // the function draws all the squares in the image
-static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, vector<Rect> &boundRects, OD4Session *od4)
+static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, vector<Rect> &boundRects)
 {
    Scalar color = Scalar(255,0,0 );
 
@@ -445,17 +448,19 @@ static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, vecto
    return image;
 }
 
-void findCars(Mat &frame, vector<Rect>& foundCars, OD4Session *od4, CascadeClassifier carsCascadeClassifier) {
+void findCars(Mat &frame, vector<Rect>& foundCars, CascadeClassifier carsCascadeClassifier) {
 
    Mat frame_gray;
-   int group_thresh = 1;
-   double merge_box_diff = 0.8;
+   // int group_thresh = 1;
+   // double merge_box_diff = 0.8;
 
    cvtColor(frame, frame_gray, COLOR_RGB2GRAY );
    equalizeHist(frame_gray, frame_gray);
    carsCascadeClassifier.detectMultiScale(frame_gray, foundCars, 1.1, 3);
 
-   groupRectangles(foundCars, group_thresh, merge_box_diff);
+   cout << "Found cars: " << foundCars.size() << endl;
+   // groupRectangles(foundCars, group_thresh, merge_box_diff);
+   // cout << "Found merged cars: " << foundCars.size() << endl;
 }
 
 void countCars(Mat frame, vector<Point> &initial_car_positions, int *cars_in_queue, bool *stop_line_arrived) {
@@ -496,7 +501,7 @@ void countCars(Mat frame, vector<Point> &initial_car_positions, int *cars_in_que
 }
 
 void detectCars(
-   OD4Session *od4, Mat& image, const vector<vector<Point> >& squares, vector<Rect> &foundCars,
+   OD4Session *od4, Mat& image, vector<Rect> &foundCars,
    double *prev_area, double *prev_centerX, double *prev_centerY,
    int *cars_in_queue, int *car_leave_timeout_counter, bool *stop_line_arrived, bool *stop_line_arrived_trigger,
    vector<Point> &initial_car_positions, bool *left_car_is_12oclock_car) {
@@ -603,7 +608,7 @@ void checkCarPosition( OD4Session *od4,
    // int front_car_boundaryX = 100;
    // int front_car_boundaryY = 240;
 
-   if (area > 50000) {  *stop_line_arrived = false;   }
+   // if (area > 50000) {  *stop_line_arrived = false;   }
 
    if (*stop_line_arrived == false) {
       left_offset = 270;
@@ -679,9 +684,9 @@ void checkCarPosition( OD4Session *od4,
 
             if (centerX_diff < 0 && centerY_diff > 0) { // moving closer and towards the left
                if (area > 1700) {                        // if car is getting bigger
-                  cout << "   / Car leaving Intersection, towards our lane. /" << endl;
-                  if (centerX < 30 && centerY > 230) {   // if very close to the bottom left of the frame
-                     cout << " <<< Car has left intersection at 9 o clock. <<<" << endl;
+                  cout << "   / Car leaving Intersection, towards our lane or 9 o clock. /" << endl;
+                  if (centerX < 220 && centerY > 230) {   // if very close to the bottom left of the frame
+                     cout << " <<< Car has left intersection at 9 o clock or towards our lane. <<<" << endl;
                      removeCarFromQueue(initial_car_positions, cars_in_queue, car_leave_timeout_counter);
                   }
                }
@@ -691,7 +696,7 @@ void checkCarPosition( OD4Session *od4,
             else if (centerY_diff > -0.5 && centerX_diff > -20 && centerX_diff < 10) {
                if (centerX > 210) {
                   cout << "   | Car leaving Intersection, towards 12 o clock. | " << endl;
-                  if (area < 1100) {            // if car is very far away
+                  if (area < 15000) {            // if car is very far away
                      cout << "    || Car has left intersection at 12 o clock. || " << endl;
                      removeCarFromQueue(initial_car_positions, cars_in_queue, car_leave_timeout_counter);
                   }
@@ -701,7 +706,7 @@ void checkCarPosition( OD4Session *od4,
             // if car is relatively going in a straight line horizontally and is moving left
             else if (centerX_diff < -0.5 && centerY_diff > -5 && centerY_diff < 5 ) {
                cout << "   < Car leaving Intersection, towards 9 o clock. < " << endl;
-               if (centerX < 30 && centerY > 150 && centerY <= 240) {
+               if (centerX < 100 && centerY > 150 && centerY <= 240) {
                   cout << "   <<< Car has left Intersection, towards 9 o clock. <<< " << endl;
                   removeCarFromQueue(initial_car_positions, cars_in_queue, car_leave_timeout_counter);
                }
