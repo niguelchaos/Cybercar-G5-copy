@@ -327,9 +327,9 @@ void checkCarDistance(double *prev_area, double area, double centerY, OD4Session
    const float DECELERATE = 999;  // code for Artificial "Letting go of the pedal"
 
    if (area < 1 || centerY > LOSTVISUAL - 1) {
-      // as per Elsadas request, attempted to put as much logic back into safedistance.cpp
+      // as per a special request, attempted to put as much logic back into safedistance.cpp
       // correction_speed = LOSTVISUAL; // special code for visual lost
-      correction_speed = -0.002;
+      correction_speed = -0.002f;
    }
    else {
       float optimal_area = 8000; // default optimal area
