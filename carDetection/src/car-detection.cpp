@@ -203,9 +203,18 @@ int32_t main(int32_t argc, char **argv) {
 
          // start detecting other cars when approaching stop line
       	auto onCarOutOfSight {
-            [&od4, VERBOSE, &leading_car_gone, &stop_line_arrived](cluon::data::Envelope &&envelope) {
+            [&od4, VERBOSE, &leading_car_gone, &stop_line_arrived, &yeet_sent](cluon::data::Envelope &&envelope) {
 
       		   auto msg = cluon::extractMessage<CarOutOfSight>(std::move(envelope));
+
+               if (leading_car_gone == true && stop_line_arrived == true && yeet_sent == true) {
+                  cout << "      Scenario is over, resetting. " << endl;
+                  stop_line_arrived = false;
+                  yeet_sent = false;
+                  leading_car_gone = true;
+                  cout << "     [ Leading Car out of sight ]  " << endl;
+               }
+
                if (stop_line_arrived == false) {
                   cout << "     [ Leading Car out of sight ]  " << endl;
                   leading_car_gone = true;
@@ -467,7 +476,7 @@ static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, vecto
 void findCars(Mat &frame, vector<Rect>& foundCars, CascadeClassifier carsCascadeClassifier) {
 
    Mat frame_gray;
-   int min_neighbors = 3;
+   int min_neighbors = 4;
    // int group_thresh = 1;
    // double merge_box_diff = 0.8;
 
