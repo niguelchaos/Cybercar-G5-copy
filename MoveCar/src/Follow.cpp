@@ -231,7 +231,7 @@ int32_t main(int32_t argc, char **argv) {
 				}
 				// if (amount == LOSTVISUAL) {
 				// 	if (currentCarSpeed >= STARTSPEED) {
-				// 		currentCarSpeed += -0.002; // car will eventually come to a stop
+				// 		currentCarSpeed += -0.001; // car will eventually come to a stop
 				// 		if (currentCarSpeed < STARTSPEED){ currentCarSpeed = 0; }
 				// 		cout << "Visual Lost, reducing speed" << endl;
 				// 	}
