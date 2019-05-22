@@ -46,6 +46,7 @@ using namespace cv;
 using namespace cluon;
 
 void detectAndDisplayStopSign( Mat frame, OD4Session *od4);
+void detectAndDisplayYieldSigns( Mat frame, OD4Session *od4);
 
 //defining variables for stop sign
 String stopSignCascadeName;
@@ -55,6 +56,14 @@ const int lookBackNoOfFrames = 8;
 int NO_OF_STOPSIGNS_REQUIRED = 5;
 int currentIndex = 0;
 bool seenFrameStopsigns[lookBackNoOfFrames] = {false};
+/////////////////////////////////////////////////////////////
+//defining variables for stop sign
+String yieldSignCascadeName;
+CascadeClassifier yieldSignCascadeClassifier;
+
+bool yieldSignPresent = false;
+int NO_OF_YIELDSIGNS_REQUIRED = 6;
+bool seenFrameYieldSign[lookBackNoOfFrames] = {false};
 
 int32_t main(int32_t argc, char **argv) {
     int32_t retCode{1};
@@ -94,6 +103,15 @@ int32_t main(int32_t argc, char **argv) {
                return -1;
             };
 
+            //Loading the haar cascade
+            //classifier trained by ourseves using this youtube tutoriastopSignCascadeNamel as guidance https://www.youtube.com/watch?time_continue=203&v=WEzm7L5zoZE
+            //The pictures taken for the classifier where from: https://github.com/cfizette/road-sign-cascades
+            yieldSignCascadeName = "/usr/bin/yieldsign.xml";
+            if(!yieldSignCascadeClassifier.load(yieldSignCascadeName)) {
+               printf("--(!)Error loading stopsign cascade\n");
+               return -1;
+            };
+            
             // Interface to a running OpenDaVINCI session; here, you can send and receive messages.
             cluon::OD4Session od4{static_cast<uint16_t>(std::stoi(commandlineArguments["cid"]))};
 
@@ -203,5 +221,74 @@ void detectAndDisplayStopSign( Mat frame, OD4Session *od4)
             }
     // -- Opens a new window with the Stop sign recognition on
    // imshow( "stopSign", frame );
+}
+
+////////////////////////////////////////////////////////////
+//If there is a stop sing in the current frame then it returns a boolean weather 
+//
+bool insertCurrentFrameYieldSign(bool yieldSignCurrentFrame) {
+
+        seenFrameYieldSign[currentIndex] = yieldSignCurrentFrame;
+        currentIndex++;
+        if(currentIndex >= lookBackNoOfFrames) {
+            //Because we don't wanna go outside of the array.
+            currentIndex = 0;
+        }
+        
+        int noOfFramesWithYieldSigns = 0; 
+        //Loop over the array and collect all the trues.
+        for(int i = 0; i < lookBackNoOfFrames; i++) {
+            if(seenFrameYieldSign[i]) {
+                noOfFramesWithYieldSigns++;
+            }
+        }
+        if(noOfFramesWithYieldSigns < NO_OF_YIELDSIGNS_REQUIRED) {
+            return false;
+        }
+        else {
+            return true;
+        }
+}
+
+//Haar cascade for yieldSigns copied and modified from
+//https://docs.opencv.org/3.4.1/db/d28/tutorial_cascade_classifier.html
+
+void detectAndDisplayYieldSigns( Mat frame, OD4Session *od4)
+{
+    //Sending messages for yield sign detection
+    YieldPresenceUpdate yieldPresenceUpdate;
+
+    std::vector<Rect> yieldSign;
+    Mat frame_gray;
+    cvtColor( frame, frame_gray, COLOR_BGR2GRAY );
+    equalizeHist( frame_gray, frame_gray );
+    //-- Detect yieldSigns
+    yieldSignCascadeClassifier.detectMultiScale(frame_gray, yieldSign, 1.1, 2, 0|CASCADE_SCALE_IMAGE, Size(60, 60));
+    //checks if the yieldSign is present in the current frame
+    
+        float yieldSignArea = 0;
+        for (size_t i = 0; i < yieldSign.size(); i++)
+        {
+            Point center( yieldSign[i].x + yieldSign[i].width/2, yieldSign[i].y + yieldSign[i].height/2 );
+            //Draw a circle when recognized
+            ellipse( frame, center, Size( yieldSign[i].width/2, yieldSign[i].height/2 ), 0, 0, 360, Scalar( 0, 0, 255 ), 4, 8, 0 );
+            Mat faceROI = frame_gray( yieldSign[i] );
+            yieldSignArea = yieldSign[i].width * yieldSign[i].height;
+        }
+
+        //It compares the previous state with the current one and it reports it if there is a change of state
+            bool valueToReport = insertCurrentFrameYieldSign(yieldSignArea > 3500);
+            if(yieldSignPresent != valueToReport){
+                yieldSignPresent = valueToReport;
+                yieldPresenceUpdate.yieldPresence(valueToReport);
+                if(valueToReport) {
+                    std::cout << "Forbidden right turn detected " << std::endl;
+                    od4->send(yieldPresenceUpdate);
+                } else {
+                    std::cout << "No sign being detected, take any direction " << std::endl;
+                }
+            }
+    // -- Opens a new window with the yieldSign recognition on
+  //  imshow( "yieldSign", frame );
 }
 
