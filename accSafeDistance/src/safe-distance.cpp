@@ -210,7 +210,7 @@ int32_t main(int32_t argc, char **argv) {
                // framecounter > 1 reduces accidental increases due to startup of image
                // minimum frames changed to 2 because everything slower when running
                // only send message once
-               if (lost_visual_frame_counter == 3 && framecounter > 1 && sent_lost_visual == false) {
+               if (lost_visual_frame_counter == 3 && framecounter > 0 && sent_lost_visual == false) {
                   stopLineLostVisual(&od4, &lost_visual_sec_count, &sent_lost_visual);
                }
                // reset if car is seen again
@@ -479,7 +479,7 @@ static Mat drawSquares(
         *sent_lost_visual = false;
         cout << "         << Lost Visual MESSAGE RESET. >> " << endl;
      }
-     if (rect_area > 65000) {
+     if (rect_area > 60000) {
         *stop_line_arrived = false;
         cout << "          [< Stop Line Reset - Scenario reset. >]" << endl;
      }
