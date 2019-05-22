@@ -380,7 +380,7 @@ message StopSignPresenceUpdate[id = 2007]{
    bool stopSignPresence [id = 1];
 }
 
-message YieldPresenceUpdate [id = 2011] {
+message YieldPresenceUpdate [id = 2009] {
     bool yieldPresence [id = 1];
 }
 /*
