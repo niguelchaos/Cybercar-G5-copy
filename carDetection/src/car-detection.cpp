@@ -476,7 +476,7 @@ static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, vecto
 void findCars(Mat &frame, vector<Rect>& foundCars, CascadeClassifier carsCascadeClassifier) {
 
    Mat frame_gray;
-   int min_neighbors = 4;
+   int min_neighbors = 3;
    // int group_thresh = 1;
    // double merge_box_diff = 0.8;
 
@@ -613,7 +613,7 @@ void removeCarFromQueue( vector<Point> &initial_car_positions, int *cars_in_queu
 
    if (*cars_in_queue > 0) {
       *cars_in_queue -= 1;
-      *car_leave_timeout_counter = 4; // new car must wait 4 seconds before leaving
+      *car_leave_timeout_counter = 5; // new car must wait before leaving
       cout << "            [ TIMEOUT ON ] " << *car_leave_timeout_counter << endl;
    }
 }
@@ -629,6 +629,8 @@ void checkCarPosition( OD4Session *od4,
    int frame_center = 320;
    int left_offset;
    int right_offset;
+   // special section of the frame that overlaps both left and middle.
+   // detects when 12 o clock goes to the left side.
    int stop_line_arrival_offset = 220;
 
    // int front_car_boundaryX = 100;
@@ -688,7 +690,7 @@ void checkCarPosition( OD4Session *od4,
       }
 
       if (centerX > frame_center + right_offset) {
-         if (area > 15000) {
+         if (area > 22000) { // prevent stopsign from being recognized as car
             if (initial_car_positions[2] == Point(0,0)) {
                initial_car_positions[2] = Point((int) centerX, (int) centerY);
                cout << "   >>>> ADDED RIGHT CAR: " << initial_car_positions[2] << endl;
