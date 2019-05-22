@@ -149,16 +149,21 @@ int32_t main(int32_t argc, char **argv) {
          // Listen for when the car has arrived at stop line
 
          auto onStopCar {
-            [&od4, &stop_line_arrived, &left_car_is_12oclock_car]
+            [&od4, &stop_line_arrived, &left_car_is_12oclock_car, &leading_car_gone]
             (cluon::data::Envelope &&envelope) {
 
                auto msg = cluon::extractMessage<StopSignPresenceUpdate>(std::move(envelope));
                bool stopSignPresence = msg.stopSignPresence(); // Get the bool
                if (stopSignPresence == false) {
-                  cout << "We have arrived at the stop line, waiting 2 seconds. " << endl;
-      				stop_line_arrived = true;
-                  left_car_is_12oclock_car = true;
-                  this_thread::sleep_for(chrono::milliseconds(2000));
+                  if (leading_car_gone == false) { // if leading car not gone, then stopsign shouldnt be triggered
+                     cout << "Stop sign message received, but leading car has not left yet." << endl;
+                  }
+                  if (leading_car_gone == true) {
+                     cout << "   [ We have arrived at the stop line, waiting 2 seconds. ] " << endl;
+         				stop_line_arrived = true;
+                     left_car_is_12oclock_car = true;
+                     this_thread::sleep_for(chrono::milliseconds(2000)); // make sure car is stopped.
+                  }
                }
             }
          };
@@ -198,12 +203,18 @@ int32_t main(int32_t argc, char **argv) {
 
          // start detecting other cars when approaching stop line
       	auto onCarOutOfSight {
-            [&od4, VERBOSE, &leading_car_gone](cluon::data::Envelope &&envelope) {
+            [&od4, VERBOSE, &leading_car_gone, &stop_line_arrived](cluon::data::Envelope &&envelope) {
 
       		   auto msg = cluon::extractMessage<CarOutOfSight>(std::move(envelope));
-               if (leading_car_gone == false) {
+               if (stop_line_arrived == false) {
                   cout << "     [ Leading Car out of sight ]  " << endl;
                   leading_car_gone = true;
+               }
+               if (leading_car_gone == false) {
+                  if (stop_line_arrived == true) { // should not be at stop line if leading car gone (that is, message should not repeat)
+                     cout << "   Already stopped at line, leading car should already have left. Resetting stop line to false." << endl;
+                     stop_line_arrived = false;
+                  }
                }
       		}
       	};
@@ -298,7 +309,7 @@ int32_t main(int32_t argc, char **argv) {
             }
 
             // notify movecar when it is time to go
-            if (stop_line_arrived == true && cars_in_queue == 0 && yeet_sent == false) {
+            if (leading_car_gone == true && stop_line_arrived == true && cars_in_queue == 0 && yeet_sent == false) {
                SafeToGo yeet;
                od4.send(yeet);
                cout << endl << " --=== Time to leave intersection. Waiting for direction. ===-- " << endl;
