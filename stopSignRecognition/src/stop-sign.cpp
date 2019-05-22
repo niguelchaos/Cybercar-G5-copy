@@ -51,7 +51,7 @@ void detectAndDisplayStopSign( Mat frame, OD4Session *od4);
 String stopSignCascadeName;
 CascadeClassifier stopSignCascade;
 bool stopSignPresent = false;
-const int lookBackNoOfFrames = 9;
+const int lookBackNoOfFrames = 8;
 int NO_OF_STOPSIGNS_REQUIRED = 5;
 int currentIndex = 0;
 bool seenFrameStopsigns[lookBackNoOfFrames] = {false};
@@ -96,17 +96,6 @@ int32_t main(int32_t argc, char **argv) {
 
             // Interface to a running OpenDaVINCI session; here, you can send and receive messages.
             cluon::OD4Session od4{static_cast<uint16_t>(std::stoi(commandlineArguments["cid"]))};
-
-            // //Receving messages
-            // auto onStopCar  { [&od4, VERBOSE](cluon::data::Envelope &&envelope) {
-            //       auto msg = cluon::extractMessage<StopCarRequest>(std::move(envelope));
-            //       float amount = msg.amount(); // Get the amount
-            //       if (VERBOSE) {
-            //          std::cout << "Received stop request message: " << amount << std::endl;
-            //       }
-            //    }
-            // };
-            // od4.dataTrigger(StopCarRequest::ID(), onStopCar);
 
             // Endless loop; end the program by pressing Ctrl-C.
          while (od4.isRunning()) {
@@ -197,20 +186,20 @@ void detectAndDisplayStopSign( Mat frame, OD4Session *od4)
             ellipse( frame, center, Size( stopsigns[i].width/2, stopsigns[i].height/2 ), 0, 0, 360, Scalar( 0, 0, 255 ), 4, 8, 0 );
             Mat faceROI = frame_gray( stopsigns[i] );
             stopSignArea = stopsigns[i].width * stopsigns[i].height;
-            //std::cout << " << stopSignArea: " << stopSignArea << " >> " << std::endl;
         }
 
         //It compares the previous state with the current one and it reports it if there is a change of state
-            bool valueToReport = insertCurrentFrameStopSign(stopSignArea > 5000);
+            bool valueToReport = insertCurrentFrameStopSign(stopSignArea > 3500);
             if(stopSignPresent != valueToReport){
                 stopSignPresent = valueToReport;
                 stopSignPresenceUpdate.stopSignPresence(valueToReport);
                 if(valueToReport) {
-                    std::cout << "sending stop sign detected message: " << std::endl;
+                    std::cout << "stop sign detected" << std::endl;
                 } else {
-                    std::cout << "sending NO stop sign present message: " << std::endl;
+                    std::cout << "No Stop sign is being seen anymore, so STOP! " << std::endl;
                     od4->send(stopSignPresenceUpdate);
                 }
+                
             }
     // -- Opens a new window with the Stop sign recognition on
    // imshow( "stopSign", frame );
