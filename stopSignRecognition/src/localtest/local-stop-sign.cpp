@@ -32,9 +32,12 @@ using namespace cluon;
 String stopSignCascadeName;
 CascadeClassifier stopSignCascade;
 
-//Defining variables for stop sign
-//String carsCascadeName;
-//CascadeClassifier carsCascadeClassifier;
+
+bool stopSignPresent = false;
+const int lookBackNoOfFrames = 7;
+int NO_OF_STOPSIGNS_REQUIRED = 5;
+int currentIndex = 0;
+bool seenFrameStopsigns[lookBackNoOfFrames] = {false};
 
 bool stopSignPresent = false;
 const int lookBackNoOfFrames = 8;
@@ -82,11 +85,6 @@ int main(int argc, char** argv) {
    bananaCascadeName = "../yieldsign.xml";
    if(!bananaCascadeClassifier.load(bananaCascadeName)){printf("--(!)Error loading stopsign cascade\n"); return -1; };
 
-   //Loading the haar cascade
-   //"../cars.xml" because the build file is in another folder, necessary to build for testing
-   //classifier taken from https://github.com/AdityaPai2398/Vehicle-And-Pedestrian-Detection-Using-Haar-Cascades
-  // carsCascadeName = "../cars.xml";
-   //if(!carsCascadeClassifier.load(carsCascadeName)){printf("--(!)Error loading stopsign cascade\n"); return -1; };
 
    // Capture the video stream from default or supplied capturing device.
    VideoCapture cap(argc > 1 ? atoi(argv[1]) : 0);
@@ -103,9 +101,6 @@ int main(int argc, char** argv) {
 // Method for detecting stop sign with haar cascade
      detectAndDisplayStopSign(frame);
      detectAndDisplayBananas(frame);
-
-     //Method for detecting cars
-    // detectAndDisplayCars(frame);
 
       int key = (char) waitKey(30);
       if ( key == 'q' || key == 27 ) {
@@ -172,14 +167,14 @@ void detectAndDisplayStopSign( Mat frame)
                 stopSignPresent = valueToReport;
                 stopSignPresenceUpdate.stopSignPresence(valueToReport);
                 if(valueToReport) {
-                    std::cout << "sending stop sign detected message: " << std::endl;
+                    std::cout << "you are currectly seeing a STOP sign " << std::endl;
                 } else {
                     std::cout << "sending NO stop sign present message: " << std::endl;
                      // od4->send(stopSignPresenceUpdate);
                 }
               
             }
-    // -- Opens a new window with the Stop sign recognition on
+    // -- Opens a new window with the Stop sign recognition on.
     imshow( "stopSign", frame );
 }
 

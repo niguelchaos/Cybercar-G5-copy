@@ -376,7 +376,7 @@ message opendlv.logic.cognition.GroundSpeedLimit [id = 1192] {
   float speedLimit [id = 1];
 }
 
-message StopSignPresenceUpdate[id = 2010] {
+message StopSignPresenceUpdate[id = 2010]{
    bool stopSignPresence [id = 1];
 }
 message YieldPresenceUpdate [id = 2009] {

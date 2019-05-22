@@ -259,7 +259,7 @@ message opendlv.system.NetworkStatusMessage [id = 1102] {
 }
 
 message opendlv.system.LogMessage [id = 1103] {
-  uint8 level [default = 6, id = 1]; // based on syslog: 0 = Emergency, 1 = Alert, 2 = Critical, 3 = Error, 4 = Warning, 5 = Notice, 6 = Informational, 7 = Debug
+  uint8 level [default = 6, id = 1]; // based on syslog: 0 = Emergency, 1 = Alert, 2 = Critical, 3 = Error, 4 = Warning, 5 = Notice, 6 = Informational, 7 = Debug   
   string description [id = 2];
 }
 
@@ -375,31 +375,44 @@ message opendlv.logic.cognition.GroundSteeringLimit [id = 1191] {
 message opendlv.logic.cognition.GroundSpeedLimit [id = 1192] {
   float speedLimit [id = 1];
 }
-/*
+
+
+
 message HelloWorld [id = 2000] {
-   string helloworld [id = 1];
+   string helloWorld [id =1];
+
 }
 
-message SpeedUp [id = 2001] {
-   float speed [id = 1];
+
+message SteeringCorrectionRequest [id=2005] {
+	float amount [id = 1];
 }
 
-message SpeedDown [id = 2002] {
-   float speed [id = 1];
+message SpeedCorrectionRequest [id=2006] {
+	float amount [id = 1];
 }
 
-message StopCarRequest[id = 2007]{
-    float stopRequest [id = 1];
-}*/
 
-message StopSignPresenceUpdate[id = 2010]{
-   bool stopSignPresence [id = 1];
+message SafeToGo [id = 2007] {
+
+
 }
-*/
-message StopSignPresenceUpdate[id = 2010]{
-   bool stopSignPresence [id = 1];
+
+message ChooseDirectionRequest [id=2008] {
+	 int direction [id = 1];
+	
 }
+
 
 message YieldPresenceUpdate [id = 2009] {
-    bool yieldPresence [id = 1];
+   bool yieldPresence [id = 1];
 }
+
+
+message StopSignPresenceUpdate[id = 2010]{
+   bool stopSignPresence [id = 1];
+}
+
+message CarOutOfSight[id = 2011]{
+}
+
