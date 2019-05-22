@@ -56,7 +56,8 @@ using namespace cv;
 using namespace cluon;
 
 
-static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, OD4Session *od4, double *prev_area, int *lost_visual_frame_counter, bool *sent_lost_visual);
+static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, OD4Session *od4,
+   double *prev_area, int *lost_visual_frame_counter, bool *sent_lost_visual, bool *stop_line_arrived);
 static void findSquares( const Mat& image, vector<vector<Point> >& squares );
 static double angle( Point pt1, Point pt2, Point pt0 );
 void countCars(Mat frame, vector<Rect>& rects);
@@ -188,7 +189,7 @@ int32_t main(int32_t argc, char **argv) {
                inRange(frame_HSV, Scalar(low_H_pink, low_S_pink, low_V_pink), Scalar(high_H_pink, high_S_pink, high_V_pink), frame_threshold_pink);
 
                findSquares(frame_threshold_pink, pinkSquares);
-               finalFramePink = drawSquares(frame_threshold_pink, pinkSquares, &od4, &prev_area, &lost_visual_frame_counter, &sent_lost_visual); // pass reference of prev_area
+               finalFramePink = drawSquares(frame_threshold_pink, pinkSquares, &od4, &prev_area, &lost_visual_frame_counter, &sent_lost_visual, &stop_line_arrived); // pass reference of prev_area
 
                // findSquares(frame_threshold_green, greenSquares);
                // finalFrameGreen = drawSquares(frame_threshold_green, greenSquares, 0, &od4);
@@ -419,7 +420,7 @@ void stopLineLostVisual(OD4Session *od4, int *lost_visual_sec_count, bool *sent_
 // the function draws all the squares in the image
 static Mat drawSquares(
    Mat& image, const vector<vector<Point> >& squares, OD4Session *od4,
-   double *prev_area, int *lost_visual_frame_counter, bool *sent_lost_visual)
+   double *prev_area, int *lost_visual_frame_counter, bool *sent_lost_visual, bool *stop_line_arrived)
 {
    Scalar color = Scalar(255,0,0 );
    vector<Rect> boundRects( squares.size() );
@@ -474,9 +475,13 @@ static Mat drawSquares(
      checkCarDistance( prev_area, rect_area, rect_centerY, od4);
      checkCarPosition( rect_centerX, od4);
 
-     if (rect_area > 50000) { // for testing
+     if (rect_area > 30000) { // for testing
         *sent_lost_visual = false;
         cout << "         << Lost Visual MESSAGE RESET. >> " << endl;
+     }
+     if (rect_area > 65000) {
+        *stop_line_arrived = false;
+        cout << "          [< Stop Line Reset - Scenario reset. >]" << endl;
      }
 
      *prev_area = rect_area; // remember this frame's area for the next frame
