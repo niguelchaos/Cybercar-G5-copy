@@ -395,3 +395,7 @@ message StopCarRequest[id = 2007]{
 message StopSignPresenceUpdate[id = 2010]{
    bool stopSignPresence [id = 1];
 }
+
+message YieldPresenceUpdate [id = 2009] {
+    bool yieldPresence [id = 1];
+}

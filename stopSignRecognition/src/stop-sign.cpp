@@ -52,7 +52,7 @@ void detectAndDisplayYieldSigns( Mat frame, OD4Session *od4);
 String stopSignCascadeName;
 CascadeClassifier stopSignCascade;
 bool stopSignPresent = false;
-const int lookBackNoOfFrames = 8;
+const int lookBackNoOfFrames = 7;
 int NO_OF_STOPSIGNS_REQUIRED = 5;
 int currentIndex = 0;
 bool seenFrameStopsigns[lookBackNoOfFrames] = {false};
@@ -62,8 +62,10 @@ String yieldSignCascadeName;
 CascadeClassifier yieldSignCascadeClassifier;
 
 bool yieldSignPresent = false;
+const int lookBackNoOfFramesYield = 10;
 int NO_OF_YIELDSIGNS_REQUIRED = 6;
-bool seenFrameYieldSign[lookBackNoOfFrames] = {false};
+int currentIndexYield = 0;
+bool seenFrameYieldSign[lookBackNoOfFramesYield] = {false};
 
 int32_t main(int32_t argc, char **argv) {
     int32_t retCode{1};
@@ -141,6 +143,7 @@ int32_t main(int32_t argc, char **argv) {
              frame(Rect(Point(100, 150), Point(580, 400))).copyTo(cropped_frame);
              // Method for detecting stop sign with haar cascade
              detectAndDisplayStopSign(frame , &od4);
+             detectAndDisplayYieldSigns( frame, &od4);
 
              // Display image.
             if (VERBOSE) {
@@ -228,16 +231,16 @@ void detectAndDisplayStopSign( Mat frame, OD4Session *od4)
 //
 bool insertCurrentFrameYieldSign(bool yieldSignCurrentFrame) {
 
-        seenFrameYieldSign[currentIndex] = yieldSignCurrentFrame;
-        currentIndex++;
-        if(currentIndex >= lookBackNoOfFrames) {
+        seenFrameYieldSign[currentIndexYield] = yieldSignCurrentFrame;
+        currentIndexYield++;
+        if(currentIndexYield >= lookBackNoOfFramesYield) {
             //Because we don't wanna go outside of the array.
-            currentIndex = 0;
+            currentIndexYield = 0;
         }
         
         int noOfFramesWithYieldSigns = 0; 
         //Loop over the array and collect all the trues.
-        for(int i = 0; i < lookBackNoOfFrames; i++) {
+        for(int i = 0; i < lookBackNoOfFramesYield; i++) {
             if(seenFrameYieldSign[i]) {
                 noOfFramesWithYieldSigns++;
             }
@@ -277,15 +280,15 @@ void detectAndDisplayYieldSigns( Mat frame, OD4Session *od4)
         }
 
         //It compares the previous state with the current one and it reports it if there is a change of state
-            bool valueToReport = insertCurrentFrameYieldSign(yieldSignArea > 3500);
-            if(yieldSignPresent != valueToReport){
-                yieldSignPresent = valueToReport;
-                yieldPresenceUpdate.yieldPresence(valueToReport);
-                if(valueToReport) {
+            bool valueToReportYield = insertCurrentFrameYieldSign(yieldSignArea > 3000);
+            if(yieldSignPresent != valueToReportYield){
+                yieldSignPresent = valueToReportYield;
+                yieldPresenceUpdate.yieldPresence(valueToReportYield);
+                if(valueToReportYield) {
                     std::cout << "Forbidden right turn detected " << std::endl;
                     od4->send(yieldPresenceUpdate);
                 } else {
-                    std::cout << "No sign being detected, take any direction " << std::endl;
+                    std::cout << "No yield sign is being detected, take any direction " << std::endl;
                 }
             }
     // -- Opens a new window with the yieldSign recognition on
