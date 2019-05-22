@@ -109,7 +109,7 @@ void TurnRight(cluon::OD4Session& od4, float steer, float speed, bool VERBOSE, i
 
 void GoStraight(cluon::OD4Session& od4, float speed, bool VERBOSE){
 
-	SetSteering(od4, 0.0, VERBOSE); 		
+	SetSteering(od4, 0.0, VERBOSE);
 	SetSpeed(od4, speed, VERBOSE);
 	std::this_thread::sleep_for(std::chrono::milliseconds(2000));
 	StopCar(od4, VERBOSE);
@@ -229,13 +229,13 @@ int32_t main(int32_t argc, char **argv) {
 				{
 			    		std::cout << "Received Speed Correction message: " << amount << std::endl;
 				}
-				if (amount == LOSTVISUAL) {
-					if (currentCarSpeed >= STARTSPEED) {
-						currentCarSpeed += -0.002; // car will eventually come to a stop
-						if (currentCarSpeed < STARTSPEED){ currentCarSpeed = 0; }
-						cout << "Visual Lost, reducing speed" << endl;
-					}
-				}
+				// if (amount == LOSTVISUAL) {
+				// 	if (currentCarSpeed >= STARTSPEED) {
+				// 		currentCarSpeed += -0.002; // car will eventually come to a stop
+				// 		if (currentCarSpeed < STARTSPEED){ currentCarSpeed = 0; }
+				// 		cout << "Visual Lost, reducing speed" << endl;
+				// 	}
+				// }
 				if (amount == DECELERATE) {
 					if (currentCarSpeed > STARTSPEED + 0.005) { // only begin decelerating if the car is too fast. Give the car some time to get some speed.
 						currentCarSpeed += -0.0005;
@@ -331,14 +331,14 @@ int32_t main(int32_t argc, char **argv) {
 				std::cout << "Car out of sight! Approach the stop line until stop sign is out of sight! " << std::endl;
 			}
 
-			SetSteering(od4, 0.0, VERBOSE);		
+			SetSteering(od4, 0.0, VERBOSE);
 			MoveForward(od4, STARTSPEED, VERBOSE);
 		}
 	}};
 	od4.dataTrigger(CarOutOfSight::ID(), onCarOutOfSight);
 
 
-		//Direction movments left /right /straight 
+		//Direction movments left /right /straight
 	auto onChooseDirectionRequest{[&od4, MAXSTEER, VERBOSE](cluon::data::Envelope &&envelope)
             {
 		auto msg = cluon::extractMessage<ChooseDirectionRequest>(std::move(envelope));
@@ -349,14 +349,14 @@ int32_t main(int32_t argc, char **argv) {
 		    		std::cout << "Received Direction message: " << std::endl;
 			}
 
-			if (direction == 1) {			
+			if (direction == 1) {
 			TurnRight(od4, MAXSTEER, 0.12, VERBOSE, 2000, 1500);
 			}
 
 			if (direction == 2) {
 			GoStraight (od4, 0.12, VERBOSE);
 			}
-			
+
 			else if (direction == 3) {
 			TurnLeft(od4, MAXSTEER, 0.12, VERBOSE, 1500, 2000, 2000);
 			}
@@ -366,7 +366,7 @@ int32_t main(int32_t argc, char **argv) {
 
 
         while(od4.isRunning()) {
-		
+
 		}
 		return 0;
 	}
