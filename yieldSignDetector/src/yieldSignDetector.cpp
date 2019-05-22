@@ -45,27 +45,17 @@ using namespace std;
 using namespace cv;
 using namespace cluon;
 
-void detectAndDisplayStopSign( Mat frame, OD4Session *od4);
 void detectAndDisplayYieldSigns( Mat frame, OD4Session *od4);
 
-//defining variables for stop sign
-String stopSignCascadeName;
-CascadeClassifier stopSignCascade;
-bool stopSignPresent = false;
-const int lookBackNoOfFrames = 7;
-int NO_OF_STOPSIGNS_REQUIRED = 5;
-int currentIndex = 0;
-bool seenFrameStopsigns[lookBackNoOfFrames] = {false};
-/////////////////////////////////////////////////////////////
 //defining variables for stop sign
 String yieldSignCascadeName;
 CascadeClassifier yieldSignCascadeClassifier;
 
 bool yieldSignPresent = false;
-const int lookBackNoOfFramesYield = 10;
+const int lookBackNoOfFrames = 10;
 int NO_OF_YIELDSIGNS_REQUIRED = 6;
-int currentIndexYield = 0;
-bool seenFrameYieldSign[lookBackNoOfFramesYield] = {false};
+int currentIndex = 0;
+bool seenFrameYieldSign[lookBackNoOfFrames] = {false};
 
 int32_t main(int32_t argc, char **argv) {
     int32_t retCode{1};
@@ -97,23 +87,16 @@ int32_t main(int32_t argc, char **argv) {
 
 
 
-            //Loading the haar cascade
-            //"../stopSignClassifier.xml" because the build file is in another folder, necessary to build for testing
-            stopSignCascadeName = "/usr/bin/stopSignClassifier.xml";
-            if(!stopSignCascade.load(stopSignCascadeName)) {
-               printf("--(!)Error loading stopsign cascade\n");
-               return -1;
-            };
 
-            //Loading the haar cascade
-            //classifier trained by ourseves using this youtube tutoriastopSignCascadeNamel as guidance https://www.youtube.com/watch?time_continue=203&v=WEzm7L5zoZE
-            //The pictures taken for the classifier where from: https://github.com/cfizette/road-sign-cascades
+    //Loading the haar cascade
+   //classifier trained by ourseves using this youtube tutoriastopSignCascadeNamel as guidance https://www.youtube.com/watch?time_continue=203&v=WEzm7L5zoZE
+   //The pictures taken for the classifier where from: https://github.com/cfizette/road-sign-cascades
             yieldSignCascadeName = "/usr/bin/yieldsign.xml";
             if(!yieldSignCascadeClassifier.load(yieldSignCascadeName)) {
                printf("--(!)Error loading stopsign cascade\n");
                return -1;
             };
-            
+
             // Interface to a running OpenDaVINCI session; here, you can send and receive messages.
             cluon::OD4Session od4{static_cast<uint16_t>(std::stoi(commandlineArguments["cid"]))};
 
@@ -142,8 +125,7 @@ int32_t main(int32_t argc, char **argv) {
 
              frame(Rect(Point(100, 150), Point(580, 400))).copyTo(cropped_frame);
              // Method for detecting stop sign with haar cascade
-             detectAndDisplayStopSign(frame , &od4);
-             detectAndDisplayYieldSigns( frame, &od4);
+             detectAndDisplayYieldSigns(frame , &od4);
 
              // Display image.
             if (VERBOSE) {
@@ -159,88 +141,18 @@ int32_t main(int32_t argc, char **argv) {
 
 //If there is a stop sing in the current frame then it returns a boolean weather 
 //
-bool insertCurrentFrameStopSign(bool stopSignCurrentFrame) {
+bool insertCurrentFrameYieldSign(bool yieldSignCurrentFrame) {
 
-        seenFrameStopsigns[currentIndex] = stopSignCurrentFrame;
+        seenFrameYieldSign[currentIndex] = yieldSignCurrentFrame;
         currentIndex++;
         if(currentIndex >= lookBackNoOfFrames) {
             //Because we don't wanna go outside of the array.
             currentIndex = 0;
         }
         
-        int noOfFramesWithStopsigns = 0; 
-        //Loop over the array and collect all the trues.
-        for(int i = 0; i < lookBackNoOfFrames; i++) {
-            if(seenFrameStopsigns[i]) {
-                noOfFramesWithStopsigns++;
-            }
-        }
-        if(noOfFramesWithStopsigns < NO_OF_STOPSIGNS_REQUIRED) {
-            return false;
-        }
-        else {
-            return true;
-        }
-}
-
-//Haar cascade for Stop sign copied and modified from
-//https://docs.opencv.org/3.4.1/db/d28/tutorial_cascade_classifier.html
-//Classifier gotten from : https://github.com/markgaynor/stopsigns
-void detectAndDisplayStopSign( Mat frame, OD4Session *od4)
-{
-    //Sending messages for stop sign detection
-    StopSignPresenceUpdate stopSignPresenceUpdate;
-
-    std::vector<Rect> stopsigns;
-    Mat frame_gray;
-    cvtColor( frame, frame_gray, COLOR_BGR2GRAY );
-    equalizeHist( frame_gray, frame_gray );
-    //-- Detect stop signs
-    stopSignCascade.detectMultiScale(frame_gray, stopsigns, 1.1, 2, 0|CASCADE_SCALE_IMAGE, Size(60, 60));
-    //checks if the stop sign is present in the current frame
-    
-        float stopSignArea = 0;
-        for (size_t i = 0; i < stopsigns.size(); i++)
-        {
-            Point center( stopsigns[i].x + stopsigns[i].width/2, stopsigns[i].y + stopsigns[i].height/2 );
-            //Draw a circle when recognized
-            ellipse( frame, center, Size( stopsigns[i].width/2, stopsigns[i].height/2 ), 0, 0, 360, Scalar( 0, 0, 255 ), 4, 8, 0 );
-            Mat faceROI = frame_gray( stopsigns[i] );
-            stopSignArea = stopsigns[i].width * stopsigns[i].height;
-        }
-
-        //It compares the previous state with the current one and it reports it if there is a change of state
-            bool valueToReport = insertCurrentFrameStopSign(stopSignArea > 3500);
-            if(stopSignPresent != valueToReport){
-                stopSignPresent = valueToReport;
-                stopSignPresenceUpdate.stopSignPresence(valueToReport);
-                if(valueToReport) {
-                    std::cout << "stop sign detected" << std::endl;
-                } else {
-                    std::cout << "No Stop sign is being seen anymore, so STOP! " << std::endl;
-                    od4->send(stopSignPresenceUpdate);
-                }
-                
-            }
-    // -- Opens a new window with the Stop sign recognition on
-   // imshow( "stopSign", frame );
-}
-
-////////////////////////////////////////////////////////////
-//If there is a stop sing in the current frame then it returns a boolean weather 
-//
-bool insertCurrentFrameYieldSign(bool yieldSignCurrentFrame) {
-
-        seenFrameYieldSign[currentIndexYield] = yieldSignCurrentFrame;
-        currentIndexYield++;
-        if(currentIndexYield >= lookBackNoOfFramesYield) {
-            //Because we don't wanna go outside of the array.
-            currentIndexYield = 0;
-        }
-        
         int noOfFramesWithYieldSigns = 0; 
         //Loop over the array and collect all the trues.
-        for(int i = 0; i < lookBackNoOfFramesYield; i++) {
+        for(int i = 0; i < lookBackNoOfFrames; i++) {
             if(seenFrameYieldSign[i]) {
                 noOfFramesWithYieldSigns++;
             }
@@ -280,15 +192,15 @@ void detectAndDisplayYieldSigns( Mat frame, OD4Session *od4)
         }
 
         //It compares the previous state with the current one and it reports it if there is a change of state
-            bool valueToReportYield = insertCurrentFrameYieldSign(yieldSignArea > 3000);
-            if(yieldSignPresent != valueToReportYield){
-                yieldSignPresent = valueToReportYield;
-                yieldPresenceUpdate.yieldPresence(valueToReportYield);
-                if(valueToReportYield) {
+            bool valueToReport = insertCurrentFrameYieldSign(yieldSignArea > 3500);
+            if(yieldSignPresent != valueToReport){
+                yieldSignPresent = valueToReport;
+                yieldPresenceUpdate.yieldPresence(valueToReport);
+                if(valueToReport) {
                     std::cout << "Forbidden right turn detected " << std::endl;
                     od4->send(yieldPresenceUpdate);
                 } else {
-                    std::cout << "No yield sign is being detected, take any direction " << std::endl;
+                    std::cout << "No sign being detected, take any direction " << std::endl;
                 }
             }
     // -- Opens a new window with the yieldSign recognition on

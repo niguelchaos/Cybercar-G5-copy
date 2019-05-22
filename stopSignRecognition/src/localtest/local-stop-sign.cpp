@@ -45,7 +45,19 @@ int NO_OF_STOPSIGNS_REQUIRED = 5;
 int currentIndex = 0;
 bool seenFrameStopsigns[lookBackNoOfFrames] = {false};
 
+//defining variables for stop sign
+String bananaCascadeName;
+CascadeClassifier bananaCascadeClassifier;
+
+bool bananaPresent = false;
+const int lookBackNoOfFramesYield = 10;
+int NO_OF_BANANAS_REQUIRED = 6;
+int currentIndexYield = 0;
+bool seenFrameBanana[lookBackNoOfFrames] = {false};
+
 void detectAndDisplayStopSign( Mat frame );
+void detectAndDisplayBananas( Mat frame);
+//void detectAndDisplayCars( Mat frame );
 
 static void help(const char* programName)
 {
@@ -68,6 +80,10 @@ int main(int argc, char** argv) {
    //"../stopSignClassifier.xml" because the build file is in another folder, necessary to build for testing
    stopSignCascadeName = "../stopSignClassifier.xml";
    if(!stopSignCascade.load(stopSignCascadeName)){printf("--(!)Error loading stopsign cascade\n"); return -1; };
+   
+     //The pictures taken for the classifier where from: https://github.com/cfizette/road-sign-cascades
+   bananaCascadeName = "../yieldsign.xml";
+   if(!bananaCascadeClassifier.load(bananaCascadeName)){printf("--(!)Error loading stopsign cascade\n"); return -1; };
 
 
    // Capture the video stream from default or supplied capturing device.
@@ -84,6 +100,7 @@ int main(int argc, char** argv) {
 
 // Method for detecting stop sign with haar cascade
      detectAndDisplayStopSign(frame);
+     detectAndDisplayBananas(frame);
 
       int key = (char) waitKey(30);
       if ( key == 'q' || key == 27 ) {
@@ -98,14 +115,14 @@ bool insertCurrentFrameStopSign(bool stopSignCurrentFrame) {
 
         seenFrameStopsigns[currentIndex] = stopSignCurrentFrame;
         currentIndex++;
-        if(currentIndex >= lookBackNoOfFrames) {
+        if(currentIndex >= lookBackNoOfFramesYield) {
             //Because we don't wanna go outside of the array.
             currentIndex = 0;
         }
         
         int noOfFramesWithStopsigns = 0; 
         //Loop over the array and collect all the trues.
-        for(int i = 0; i < lookBackNoOfFrames; i++) {
+        for(int i = 0; i < lookBackNoOfFramesYield; i++) {
             if(seenFrameStopsigns[i]) {
                 noOfFramesWithStopsigns++;
             }
@@ -160,3 +177,92 @@ void detectAndDisplayStopSign( Mat frame)
     // -- Opens a new window with the Stop sign recognition on.
     imshow( "stopSign", frame );
 }
+
+bool insertCurrentFrameBanana(bool bananaCurrentFrame) {
+
+        seenFrameBanana[currentIndexYield] = bananaCurrentFrame;
+        currentIndexYield++;
+        if(currentIndexYield >= lookBackNoOfFrames) {
+            //Because we don't wanna go outside of the array.
+            currentIndexYield = 0;
+        }
+        
+        int noOfFramesWithBanana = 0; 
+        //Loop over the array and collect all the trues.
+        for(int i = 0; i < lookBackNoOfFrames; i++) {
+            if(seenFrameBanana[i]) {
+                noOfFramesWithBanana++;
+            }
+        }
+        if(noOfFramesWithBanana < NO_OF_BANANAS_REQUIRED) {
+            return false;
+        }
+        else {
+            return true;
+        }
+}
+
+//Haar cascade for cars copied and modified from
+//https://docs.opencv.org/3.4.1/db/d28/tutorial_cascade_classifier.html
+
+void detectAndDisplayBananas( Mat frame)
+{
+    //Sending messages for banana detection
+    YieldPresenceUpdate yieldPresenceUpdate;
+
+    std::vector<Rect> bananas;
+    Mat frame_gray;
+    cvtColor( frame, frame_gray, COLOR_BGR2GRAY );
+    equalizeHist( frame_gray, frame_gray );
+    //-- Detect bananas
+    bananaCascadeClassifier.detectMultiScale(frame_gray, bananas, 1.1, 2, 0|CASCADE_SCALE_IMAGE, Size(60, 60));
+    //checks if the bananas is present in the current frame
+    
+        float bananaArea = 0;
+        for (size_t i = 0; i < bananas.size(); i++)
+        {
+            Point center( bananas[i].x + bananas[i].width/2, bananas[i].y + bananas[i].height/2 );
+            //Draw a circle when recognized
+            ellipse( frame, center, Size( bananas[i].width/2, bananas[i].height/2 ), 0, 0, 360, Scalar( 0, 0, 255 ), 4, 8, 0 );
+            Mat faceROI = frame_gray( bananas[i] );
+            bananaArea = bananas[i].width * bananas[i].height;
+        }
+
+        //It compares the previous state with the current one and it reports it if there is a change of state
+            bool valueToReportYield = insertCurrentFrameBanana(bananaArea > 3500);
+            if(bananaPresent != valueToReportYield){
+                bananaPresent = valueToReportYield;
+                yieldPresenceUpdate.yieldPresence(valueToReportYield);
+                if(valueToReportYield) {
+                    std::cout << "There is a banana, Don't turn right! " << std::endl;
+                    //od4->send(bananaPresenceUpdate);
+                } else {
+                    std::cout << "There are NO bananas anymore " << std::endl;
+                }
+                // maybe say something here like "no bananas are being seen yet!
+            }
+    // -- Opens a new window with the banana recognition on
+    imshow( "bananas", frame );
+}
+
+/*void detectAndDisplayCars( Mat frame )
+{
+
+    std::vector<Rect> cars;
+    Mat frame_gray;
+    cvtColor( frame, frame_gray, COLOR_BGR2GRAY );
+    equalizeHist( frame_gray, frame_gray );
+    //-- Detect stop signs
+    carsCascadeClassifier.detectMultiScale( frame_gray, cars, 1.1, 2, 0|CASCADE_SCALE_IMAGE, Size(60, 60) );
+   for ( size_t i = 0; i < cars.size(); i++ )
+    {
+        Point center( cars[i].x + cars[i].width/2, cars[i].y + cars[i].height/2 );
+        //Draw a circle when recognized
+       ellipse( frame, center, Size( cars[i].width/2, cars[i].height/2 ), 0, 0, 360, Scalar( 255, 0, 255 ), 4, 8, 0 );
+       Mat faceROI = frame_gray( cars[i] );
+    }
+   // -- Opens a new window with the Stop sign recognition on
+   imshow( "cars", frame );
+
+}*/
+
