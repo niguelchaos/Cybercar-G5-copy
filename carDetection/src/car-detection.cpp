@@ -688,9 +688,11 @@ void checkCarPosition( OD4Session *od4,
       }
 
       if (centerX > frame_center + right_offset) {
-         if (initial_car_positions[2] == Point(0,0)) {
-            initial_car_positions[2] = Point((int) centerX, (int) centerY);
-            cout << "   >>>> ADDED RIGHT CAR: " << initial_car_positions[2] << endl;
+         if (area > 15000) {
+            if (initial_car_positions[2] == Point(0,0)) {
+               initial_car_positions[2] = Point((int) centerX, (int) centerY);
+               cout << "   >>>> ADDED RIGHT CAR: " << initial_car_positions[2] << endl;
+            }
          }
          else if (centerX_diff > 0 && centerY_diff > 0) {
             cout << "Detected car on right side, probably car at 3 o clock." << endl;
