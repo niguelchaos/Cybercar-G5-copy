@@ -484,7 +484,7 @@ void findCars(Mat &frame, vector<Rect>& foundCars, CascadeClassifier carsCascade
 
    cvtColor(frame, frame_gray, COLOR_RGB2GRAY );
    equalizeHist(frame_gray, frame_gray);
-   carsCascadeClassifier.detectMultiScale(frame_gray, foundCars, 1.1, min_neighbors);
+   carsCascadeClassifier.detectMultiScale(frame_gray, foundCars, 1.3, min_neighbors);
 
    // cout << "Found cars: " << foundCars.size() << endl;
    // groupRectangles(foundCars, group_thresh, merge_box_diff);
