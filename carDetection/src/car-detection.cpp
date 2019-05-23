@@ -149,7 +149,7 @@ int32_t main(int32_t argc, char **argv) {
          // Listen for when the car has arrived at stop line
 
          auto onStopCar {
-            [&od4, &stop_line_arrived, &left_car_is_12oclock_car, &leading_car_gone]
+            [&od4, &stop_line_arrived, &left_car_is_12oclock_car, &leading_car_gone, &stop_line_arrived_trigger, &yeet_sent]
             (cluon::data::Envelope &&envelope) {
 
                auto msg = cluon::extractMessage<StopSignPresenceUpdate>(std::move(envelope));
@@ -158,11 +158,12 @@ int32_t main(int32_t argc, char **argv) {
                   if (leading_car_gone == false) { // if leading car not gone, then stopsign shouldnt be triggered
                      cout << "Stop sign message received, but leading car has not left yet." << endl;
                   }
-                  if (leading_car_gone == true) {
-                     cout << "   [ We have arrived at the stop line, waiting 2 seconds. ] " << endl;
-         				stop_line_arrived = true;
+                  if (leading_car_gone == true && yeet_sent == false) {
+                     cout << "   [ We have arrived at the stop line, waiting 4 seconds. ] " << endl;
+         				// stop_line_arrived = true;
+                     stop_line_arrived_trigger = true;
                      left_car_is_12oclock_car = true;
-                     this_thread::sleep_for(chrono::milliseconds(2000)); // make sure car is stopped.
+                     // this_thread::sleep_for(chrono::milliseconds(4000)); // make sure car is stopped.
                   }
                }
             }
@@ -203,7 +204,7 @@ int32_t main(int32_t argc, char **argv) {
 
          // start detecting other cars when approaching stop line
       	auto onCarOutOfSight {
-            [&od4, VERBOSE, &leading_car_gone, &stop_line_arrived, &yeet_sent](cluon::data::Envelope &&envelope) {
+            [&od4, VERBOSE, &leading_car_gone, &stop_line_arrived, &yeet_sent, &stop_line_arrived_trigger](cluon::data::Envelope &&envelope) {
 
       		   auto msg = cluon::extractMessage<CarOutOfSight>(std::move(envelope));
 
@@ -212,6 +213,7 @@ int32_t main(int32_t argc, char **argv) {
                   stop_line_arrived = false;
                   yeet_sent = false;
                   leading_car_gone = true;
+                  stop_line_arrived_trigger = 4;
                   cout << "     [ Leading Car out of sight ]  " << endl;
                }
 
@@ -690,7 +692,7 @@ void checkCarPosition( OD4Session *od4,
       }
 
       if (centerX > frame_center + right_offset) {
-         if (area > 22000) { // prevent stopsign from being recognized as car
+         if (area > 10000) { // prevent stopsign from being recognized as car
             if (initial_car_positions[2] == Point(0,0)) {
                initial_car_positions[2] = Point((int) centerX, (int) centerY);
                cout << "   >>>> ADDED RIGHT CAR: " << initial_car_positions[2] << endl;
@@ -712,7 +714,8 @@ void checkCarPosition( OD4Session *od4,
          // car is on middle/left - camera too close to see left
          if (centerX >= frame_center - left_offset && centerX < frame_center + right_offset) {
 
-            if (centerX_diff < 0 && centerY_diff > 0) { // moving closer and towards the left
+            if (centerX_diff > -30 && centerX_diff < 0 &&
+               centerY_diff > 0 && centerY_diff < 40) { // moving closer and towards the left
                if (area > 10000) {                        // if car is getting bigger
                   cout << "   / Car leaving Intersection, towards our lane or 9 o clock. /" << endl;
                   if (centerX < 220 && centerY > 230) {   // if very close to the bottom left of the frame
@@ -723,7 +726,8 @@ void checkCarPosition( OD4Session *od4,
             }
 
             //  if car is going higher in the frame and relatively straight
-            else if (centerY_diff > -0.5 && centerX_diff > -20 && centerX_diff < 10) {
+            else if (centerY_diff > -0.5 && centerY_diff < 200 &&
+                     centerX_diff > -20 && centerX_diff < 10) {
                if (centerX > 210) {
                   cout << "   | Car leaving Intersection, towards 12 o clock. | " << endl;
                   if (area < 15000) {            // if car is very far away
@@ -734,7 +738,8 @@ void checkCarPosition( OD4Session *od4,
             }
 
             // if car is relatively going in a straight line horizontally and is moving left
-            else if (centerX_diff < -0.5 && centerY_diff > -5 && centerY_diff < 5 ) {
+            else if (centerX_diff > -200 && centerX_diff < -0.5 &&
+                     centerY_diff > -5 && centerY_diff < 5 ) {
                cout << "   < Car leaving Intersection, towards 9 o clock. < " << endl;
                if (centerX < 180 && centerY > 150 && centerY <= 240) {
                   cout << "   <<< Car has left Intersection, towards 9 o clock. <<< " << endl;
@@ -745,7 +750,8 @@ void checkCarPosition( OD4Session *od4,
 
 
          if (centerX > frame_center + right_offset) {
-            if (centerX_diff > 0.5 && centerY_diff > -5 && centerY_diff < 5) {
+            if (centerX_diff > 0.5 && centerX_diff < 200 &&
+                  centerY_diff > -5 && centerY_diff < 5) {
                cout << "    > Car leaving Intersection towards 3 o clock >" << endl;
                if (centerX > 510) {
                   cout << "   >> Car has left at 3 o clock >> " << endl;
