@@ -54,7 +54,6 @@ RUN echo http://dl-4.alpinelinux.org/alpine/v3.8/main > /etc/apk/repositories &&
 RUN [ "cross-build-end" ]
 
 WORKDIR /usr/bin
-COPY --from=builder /tmp/bin/stop-sign .
-COPY src/stopSignClassifier.xml .
+COPY --from=builder /tmp/bin/yieldSignDetector .
 COPY src/yieldsign.xml .
-ENTRYPOINT ["/usr/bin/stop-sign"]
+ENTRYPOINT ["/usr/bin/yieldSignDetector"]
