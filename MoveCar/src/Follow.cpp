@@ -107,11 +107,11 @@ void TurnRight(cluon::OD4Session& od4, float steer, float speed, bool VERBOSE, i
 	StopCar(od4, VERBOSE);
 }
 
-void GoStraight(cluon::OD4Session& od4, float speed, bool VERBOSE){
+void GoStraight(cluon::OD4Session& od4, float speed, bool VERBOSE, int timer1){
 
 	SetSteering(od4, 0.0, VERBOSE);
 	SetSpeed(od4, speed, VERBOSE);
-	std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+	std::this_thread::sleep_for(std::chrono::milliseconds(timer1));
 	StopCar(od4, VERBOSE);
 
 }
@@ -144,10 +144,7 @@ int32_t main(int32_t argc, char **argv) {
 
 		const float MAXSTEER{(commandlineArguments["maxsteer"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["maxsteer"])) : static_cast<float>(0.4)};
 		const float MINSTEER{(commandlineArguments["minsteer"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["minsteer"])) : static_cast<float>(-0.4)};
-		const float SAFETYDISTANCE{(commandlineArguments["safetyDistance"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["safetyDistance"])) : static_cast<float>(0.15)};
-
-		const float LOSTVISUAL = 1337;
-		const float DECELERATE = 999;
+		const float SAFETYDISTANCE{(commandlineArguments["safetyDistance"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["safetyDistance"])) : static_cast<float>(0.07)};
 
 		bool safety_dist_triggered = false;
       // A Data-triggered function to detect front obstacle and stop or move car accordingly
@@ -349,16 +346,16 @@ int32_t main(int32_t argc, char **argv) {
 		    		std::cout << "Received Direction message: " << std::endl;
 			}
 
-			if (direction == 1) {
-			TurnRight(od4, MAXSTEER, 0.12, VERBOSE, 2000, 1500);
+			if (direction == 1) {			
+			TurnRight(od4, MAXSTEER, 0.12, VERBOSE, 2200, 1500);
 			}
 
 			if (direction == 2) {
-			GoStraight (od4, 0.12, VERBOSE);
+			GoStraight (od4, 0.12, VERBOSE, 3000);
 			}
 
 			else if (direction == 3) {
-			TurnLeft(od4, MAXSTEER, 0.12, VERBOSE, 1500, 2000, 2000);
+			TurnLeft(od4, MAXSTEER, 0.12, VERBOSE, 1400, 2000, 2000);
 			}
 	    }
         };
