@@ -146,6 +146,8 @@ int32_t main(int32_t argc, char **argv) {
 		const float MINSTEER{(commandlineArguments["minsteer"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["minsteer"])) : static_cast<float>(-0.4)};
 		const float SAFETYDISTANCE{(commandlineArguments["safetyDistance"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["safetyDistance"])) : static_cast<float>(0.07)};
 
+		const float LOSTVISUAL = 1337;
+		const float DECELERATE = 999;
 		bool safety_dist_triggered = false;
       // A Data-triggered function to detect front obstacle and stop or move car accordingly
       float currentDistance{0.0};
@@ -346,7 +348,7 @@ int32_t main(int32_t argc, char **argv) {
 		    		std::cout << "Received Direction message: " << std::endl;
 			}
 
-			if (direction == 1) {			
+			if (direction == 1) {
 			TurnRight(od4, MAXSTEER, 0.12, VERBOSE, 2200, 1500);
 			}
 
