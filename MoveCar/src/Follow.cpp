@@ -54,11 +54,11 @@ void MoveForward(cluon::OD4Session& od4, float speed, bool VERBOSE)
 {
 	SetSpeed(od4, speed, VERBOSE);
 	// if (VERBOSE) std::cout << "Now move forward ... " << std::endl;
-	
+
 	if (standingStillForPeriodOfTime == false) { // The car was never still for a period of time
-		if (previousSpeed != 0.0 && speed == 0.0) { 
+		if (previousSpeed != 0.0 && speed == 0.0) {
 			lastTimeZeroSpeed = std::chrono::system_clock::now(); // Take time stamp when car stopped
-		} else if (previousSpeed == 0.0 && speed == 0.0) { 
+		} else if (previousSpeed == 0.0 && speed == 0.0) {
 			// Inspired by: https://en.cppreference.com/w/cpp/chrono/system_clock/now and https://en.cppreference.com/w/cpp/chrono
 			auto now = std::chrono::system_clock::now();
 			std::chrono::duration<double> elapsed_seconds = now-lastTimeZeroSpeed; // Calculate the time the car stands still
@@ -109,7 +109,7 @@ void TurnRight(cluon::OD4Session& od4, float steer, float speed, bool VERBOSE, i
 
 void GoStraight(cluon::OD4Session& od4, float speed, bool VERBOSE, int timer1){
 
-	SetSteering(od4, 0.0, VERBOSE); 		
+	SetSteering(od4, 0.0, VERBOSE);
 	SetSpeed(od4, speed, VERBOSE);
 	std::this_thread::sleep_for(std::chrono::milliseconds(timer1));
 	StopCar(od4, VERBOSE);
@@ -139,16 +139,19 @@ int32_t main(int32_t argc, char **argv) {
 		}
 
 	   const bool VERBOSE{commandlineArguments.count("verbose") != 0};
-		const float STARTSPEED{(commandlineArguments["startspeed"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["startspeed"])) : static_cast<float>(0.11)};
-		const float MAXSPEED{(commandlineArguments["maxspeed"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["maxspeed"])) : static_cast<float>(0.25)};
+		const float STARTSPEED{(commandlineArguments["startspeed"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["startspeed"])) : static_cast<float>(0.109)};
+		const float MAXSPEED{(commandlineArguments["maxspeed"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["maxspeed"])) : static_cast<float>(0.12)};
 
 		const float MAXSTEER{(commandlineArguments["maxsteer"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["maxsteer"])) : static_cast<float>(0.4)};
 		const float MINSTEER{(commandlineArguments["minsteer"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["minsteer"])) : static_cast<float>(-0.4)};
 		const float SAFETYDISTANCE{(commandlineArguments["safetyDistance"].size() != 0) ? static_cast<float>(std::stof(commandlineArguments["safetyDistance"])) : static_cast<float>(0.07)};
 
+		const float LOSTVISUAL = 1337;
+		const float DECELERATE = 999;
+		bool safety_dist_triggered = false;
       // A Data-triggered function to detect front obstacle and stop or move car accordingly
       float currentDistance{0.0};
-      auto onFrontDistanceReading{ [&od4, SAFETYDISTANCE, VERBOSE, &currentDistance](cluon::data::Envelope &&envelope)
+      auto onFrontDistanceReading{ [&od4, SAFETYDISTANCE, VERBOSE, MINSTEER, MAXSTEER, &currentDistance, &safety_dist_triggered](cluon::data::Envelope &&envelope)
       { // &<variables> will be captured by reference (instead of value only)
 	      auto msg = cluon::extractMessage<opendlv::proxy::DistanceReading>(std::move(envelope));
 			// senderStamp 0 corresponds to front ultra-sound distance sensor
@@ -161,12 +164,27 @@ int32_t main(int32_t argc, char **argv) {
 	            // std::cout << "Received DistanceReading message (senderStamp=" << senderStamp << "): " << currentDistance << std::endl;
 	        	}
 				if (currentDistance <= SAFETYDISTANCE) {
-				MoveForward(od4, 0.0, VERBOSE); // Stop the car if obstacle is too close
+				// Stop the car if obstacle is too close
+				// StopCar(od4, VERBOSE);
+				// move forward is used because it counts time.
 				currentCarSpeed = 0.0;
-				currentSteering = 0.0; // reset wheels too just in case
+				MoveForward(od4, currentCarSpeed, VERBOSE);
+
+				if (currentSteering < -0.2) { // steering right
+					currentSteering = currentSteering - (currentSteering / 3); // turn to the left quickly
+				}
+				if (currentSteering > 0.2) { // steering left
+					currentSteering = currentSteering - (currentSteering / 3); // turn to the right quickly
+				}
+				// although they should straighten, this is here just in case code goes crazy
+				if (currentSteering < MINSTEER) { currentSteering = MINSTEER; }
+				if (currentSteering > MAXSTEER) { currentSteering = MAXSTEER; }
+
 				SetSteering(od4, currentSteering, VERBOSE);
+				safety_dist_triggered = true; // used to override steering corrections
 				std::cout << "Obstacle too close: " << currentDistance << std::endl;
 				}
+				if (currentDistance > SAFETYDISTANCE) { safety_dist_triggered = false; }
 			}
        }
    };
@@ -198,31 +216,48 @@ int32_t main(int32_t argc, char **argv) {
 
 
 // [Relative PID for speed correction]
-	auto onSpeedCorrection{[&od4, VERBOSE, STARTSPEED, MAXSPEED](cluon::data::Envelope &&envelope)
+	auto onSpeedCorrection {
+	    [&od4, VERBOSE, STARTSPEED, MAXSPEED, LOSTVISUAL, DECELERATE, &safety_dist_triggered](cluon::data::Envelope &&envelope)
 	{
-		if (!standingStillForPeriodOfTime) { // Don't listen corrections if car was still for period of time
+    	if (safety_dist_triggered == false) {
+		    if (!standingStillForPeriodOfTime) { // Don't listen corrections if car was still for period of time
 			auto msg = cluon::extractMessage<SpeedCorrectionRequest>(std::move(envelope));
 			float amount = msg.amount(); // Get the amount
 
-			if (VERBOSE)
-			{
-		    		std::cout << "Received Speed Correction message: " << amount << std::endl;
-			}
-			if ( currentCarSpeed < STARTSPEED && amount > 0) 	{ currentCarSpeed = STARTSPEED;	}// Set car speed to minimal moving car speed
-			if ( currentCarSpeed < STARTSPEED && amount < 0) 	{ currentCarSpeed = 0.0;	} // automatically makes it 0, preventing car from moving backwards
-			else {
-				currentCarSpeed += amount;
-				if (currentCarSpeed > MAXSPEED) 	{ currentCarSpeed = MAXSPEED;	} // limit the speed car can go
-				if (currentCarSpeed < STARTSPEED){ currentCarSpeed = 0;			} // prevent the car from going backwards. Twice.
-			}
-			MoveForward(od4, currentCarSpeed, VERBOSE);
+				if (VERBOSE)
+				{
+			    		std::cout << "Received Speed Correction message: " << amount << std::endl;
+				}
+				// if (amount == LOSTVISUAL) {
+				// 	if (currentCarSpeed >= STARTSPEED) {
+				// 		currentCarSpeed += -0.001; // car will eventually come to a stop
+				// 		if (currentCarSpeed < STARTSPEED){ currentCarSpeed = 0; }
+				// 		cout << "Visual Lost, reducing speed" << endl;
+				// 	}
+				// }
+				if (amount == DECELERATE) {
+					if (currentCarSpeed > STARTSPEED + 0.005) { // only begin decelerating if the car is too fast. Give the car some time to get some speed.
+						currentCarSpeed += -0.0005;
+						if (currentCarSpeed < STARTSPEED){ currentCarSpeed = 0; } // should not enter here, but if it does, here is backup.
+						cout << "Maintaining Distance, decelerating" << endl;
+					}
+				}
+				else if (amount < 1) { // if normal amount
+					if ( currentCarSpeed < STARTSPEED && amount > 0 && amount < LOSTVISUAL) 	{ currentCarSpeed = STARTSPEED;	}// Set car speed to minimal moving car speed
+					if ( currentCarSpeed < STARTSPEED && amount < 0) 	{ currentCarSpeed = 0.0;	} // automatically makes it 0, preventing car from moving backwards
+					currentCarSpeed += amount;
+					if (currentCarSpeed > MAXSPEED) 	{ currentCarSpeed = MAXSPEED;	} // limit the speed car can go
+					if (currentCarSpeed < STARTSPEED){ currentCarSpeed = 0;			} // prevent the car from going backwards. Twice.
+				}
+				MoveForward(od4, currentCarSpeed, VERBOSE);
+		    }
 		}
 	}
 };
 // (Data trigger below)
 // [Absolute pid for speed was too fast]
 // Absolute pid steering
-	auto onSteeringCorrection{[&od4, VERBOSE, MAXSTEER, MINSTEER, MAXSPEED, STARTSPEED ](cluon::data::Envelope &&envelope)
+	auto onSteeringCorrection{[&od4, VERBOSE, MAXSTEER, MINSTEER, MAXSPEED, STARTSPEED, LOSTVISUAL ](cluon::data::Envelope &&envelope)
 	{
 		if (!standingStillForPeriodOfTime) { // Don't listen corrections if car was still for period of time
 			auto msg = cluon::extractMessage<SteeringCorrectionRequest>(std::move(envelope));
@@ -240,10 +275,38 @@ int32_t main(int32_t argc, char **argv) {
 				currentSteering = 0; // ...then reset wheels
 				cout << "Steering Reset." << endl;
 			}
-			else {
-				currentSteering = amount;
-				if (currentSteering > MAXSTEER) { currentSteering = MAXSTEER; }
+
+			if (amount == LOSTVISUAL) { // slowly straighten back out the wheels if visual lost
+				if (currentSteering >= -0.05 && currentSteering <= 0.05) {
+					currentSteering = 0;
+				}
+				if (currentSteering < 0) { // steering right
+					currentSteering = currentSteering - (currentSteering / 10); // turn to the left
+				}
+				if (currentSteering > 0) { // steering left
+					currentSteering = currentSteering - (currentSteering / 10); // turn to the right
+				}
+				// although they should straighten, this is here just in case code goes crazy
 				if (currentSteering < MINSTEER) { currentSteering = MINSTEER; }
+				if (currentSteering > MAXSTEER) { currentSteering = MAXSTEER; }
+			}
+
+			else if (amount <= 0.4) { // if normal amount
+				currentSteering = amount;
+				if (currentSteering > MAXSTEER) {
+					currentSteering = MAXSTEER;
+
+					if (currentCarSpeed > STARTSPEED) { // slow down the car to give the car time to make it less blurry
+						currentCarSpeed = currentCarSpeed - 0.002;
+					}
+				}
+				if (currentSteering < MINSTEER) {
+					currentSteering = MINSTEER;
+
+					if (currentCarSpeed > STARTSPEED) { // slow down the car to give the car time to make it less blurry
+						currentCarSpeed = currentCarSpeed - 0.002;
+					}
+				}
 			}
 			SetSteering(od4, currentSteering, VERBOSE);
 		}
@@ -253,28 +316,28 @@ int32_t main(int32_t argc, char **argv) {
 // triggers - ordering is probably important
        od4.dataTrigger(SteeringCorrectionRequest::ID(), onSteeringCorrection); //check steering correction first
 	    od4.dataTrigger(SpeedCorrectionRequest::ID(), onSpeedCorrection);
-	
+
 
 
 	// Function to move forward to approach the stop line
 	auto onCarOutOfSight{[&od4, VERBOSE, STARTSPEED ](cluon::data::Envelope &&envelope)
 	{
 		auto msg = cluon::extractMessage<CarOutOfSight>(std::move(envelope));
-	  	
+
 		if (standingStillForPeriodOfTime == true) {
 			if (VERBOSE)
 			{
 				std::cout << "Car out of sight! Approach the stop line until stop sign is out of sight! " << std::endl;
 			}
 
-			SetSteering(od4, 0.0, VERBOSE);		
+			SetSteering(od4, 0.0, VERBOSE);
 			MoveForward(od4, STARTSPEED, VERBOSE);
 		}
 	}};
-	od4.dataTrigger(CarOutOfSight::ID(), onCarOutOfSight); 
+	od4.dataTrigger(CarOutOfSight::ID(), onCarOutOfSight);
 
 
-		//Direction movments left /right /straight 
+		//Direction movments left /right /straight
 	auto onChooseDirectionRequest{[&od4, MAXSTEER, VERBOSE](cluon::data::Envelope &&envelope)
             {
 		auto msg = cluon::extractMessage<ChooseDirectionRequest>(std::move(envelope));
@@ -285,14 +348,14 @@ int32_t main(int32_t argc, char **argv) {
 		    		std::cout << "Received Direction message: " << std::endl;
 			}
 
-			if (direction == 1) {			
+			if (direction == 1) {
 			TurnRight(od4, MAXSTEER, 0.12, VERBOSE, 2200, 1500);
 			}
 
 			if (direction == 2) {
 			GoStraight (od4, 0.12, VERBOSE, 3000);
 			}
-			
+
 			else if (direction == 3) {
 			TurnLeft(od4, MAXSTEER, 0.12, VERBOSE, 1400, 2000, 2000);
 			}
@@ -302,7 +365,7 @@ int32_t main(int32_t argc, char **argv) {
 
 
         while(od4.isRunning()) {
-		
+
 		}
 		return 0;
 	}
