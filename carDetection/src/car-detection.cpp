@@ -103,7 +103,7 @@ int32_t main(int32_t argc, char **argv) {
          String carsCascadeName;
          CascadeClassifier carsCascadeClassifier;
 
-         // XML from Group 8. Permission Given by Group 8.
+         // XML trained by Group 8. Permission Given by Group 8 and Student TAs.
          // == for local testing ==
          // carsCascadeName = "../src/car-28-stages.xml";
 
@@ -132,13 +132,15 @@ int32_t main(int32_t argc, char **argv) {
 
          bool stop_line_arrived = false;
          bool stop_line_arrived_trigger = false;
-         int stop_line_arrived_trigger_counter = 4;
+         int stop_line_arrived_trigger_counter = 4; // sets stop_line_arrived to true when 0 - makes sure car is stopped.
 
+         // needs to know when we are close
          bool left_car_is_12oclock_car = false;
 
          bool leading_car_gone = false; // know when to start looking for cars
          bool yeet_sent = false; // used to know when to stop looking for cars
 
+         // sensor values for detecting leaving cars
          const float MINFRONTDIST = 0.1f;
          // const float MAXFRONTDIST = 0.8f;
          const float LEFTINTERSECTFRONTDIST = 0.4f;
@@ -147,7 +149,6 @@ int32_t main(int32_t argc, char **argv) {
          const float MAXLEFTDIST = 0.4f;
 
          // Listen for when the car has arrived at stop line
-
          auto onStopCar {
             [&od4, &stop_line_arrived, &left_car_is_12oclock_car, &leading_car_gone, &stop_line_arrived_trigger, &yeet_sent]
             (cluon::data::Envelope &&envelope) {
@@ -158,18 +159,17 @@ int32_t main(int32_t argc, char **argv) {
                   if (leading_car_gone == false) { // if leading car not gone, then stopsign shouldnt be triggered
                      cout << "Stop sign message received, but leading car has not left yet." << endl;
                   }
-                  if (leading_car_gone == true && yeet_sent == false) {
+                  if (leading_car_gone == true && yeet_sent == false) { // yeet_sent = safe to go
                      cout << "   [ We have arrived at the stop line, waiting 4 seconds. ] " << endl;
-         				// stop_line_arrived = true;
-                     stop_line_arrived_trigger = true;
+                     stop_line_arrived_trigger = true; // make sure car is stopped.
                      left_car_is_12oclock_car = true;
-                     // this_thread::sleep_for(chrono::milliseconds(4000)); // make sure car is stopped.
                   }
                }
             }
          };
          od4.dataTrigger(StopSignPresenceUpdate::ID(), onStopCar);
 
+         // sensors are used here to detect leaving cars
          float currentDistance{0.0};
          auto onDistanceReadingAtStopLine {
             [&od4, &stop_line_arrived, &currentDistance, &initial_car_positions,
@@ -231,8 +231,6 @@ int32_t main(int32_t argc, char **argv) {
       	};
       	od4.dataTrigger(CarOutOfSight::ID(), onCarOutOfSight);
 
-
-
          // Endless loop; end the program by pressing Ctrl-C.
          while (od4.isRunning()) {
             Mat frame;
@@ -242,12 +240,8 @@ int32_t main(int32_t argc, char **argv) {
             Mat brightened_frame;
             Mat frame_threshold;
             Mat final_frame;
-            // vector<vector<Point> > squares;
-            // vector<Rect> boundRects;
-            vector<Rect> foundCars;
 
-            // const int max_value_H = 360/2;
-            // const int max_value = 255;
+            vector<Rect> foundCars;
 
             // Wait for a notification of a new frame.
             sharedMemory->wait();
@@ -270,49 +264,18 @@ int32_t main(int32_t argc, char **argv) {
             int64_t timestampmicro = cluon::time::toMicroseconds(cluon::time::now());
             int64_t timestampsecs = timestampmicro / 1000000;
 
-         // Pink
-            // int low_H_pink = 135;
-            // int low_S_pink = 55;
-            // int low_V_pink = 65;
-            // int high_H_pink = max_value_H;
-            // int high_S_pink = max_value;
-            // int high_V_pink = max_value;
-
-         // Green
-            // int low_H_green = 42;
-            // int low_S_green = 18;
-            // int low_V_green = 102;
-            // int high_H_green = 92;
-            // int high_S_green = 182;
-            // int high_V_green = 255;
-
             // Crop the frame to get useful stuff
             frame(Rect(Point(0, 0), Point(640, 370))).copyTo(cropped_frame);
 
             // only start detecting cars when leading car is gone
-
             if (leading_car_gone == true) {
                if (yeet_sent == false) {
-
-                  // auto brighten needs to be in BGR
-                  // RGB > BGR (brighten frame) > HSV (detect colors)
-                  // cvtColor(cropped_frame, brightened_frame, COLOR_RGB2BGR);
-                  // Automatically increase the brightness and contrast of the video.
-                  // BrightnessAndContrastAuto(cropped_frame, brightened_frame, 0.6f);
-
-                  // Convert from BGR to HSV colorspace
-                  // cvtColor(brightened_frame, frame_HSV, COLOR_RGB2HSV);
-                  // Detect the object based on HSV Range Values
-                  // inRange(frame_HSV, Scalar(low_H_pink, low_S_pink, low_V_pink), Scalar(high_H_pink, high_S_pink, high_V_pink), frame_threshold);
-
 
                   // Method for detecting car with haar cascade
                   findCars(cropped_frame, foundCars, carsCascadeClassifier);
 
-                  // findSquares(frame_threshold, squares);
-                  // final_frame = drawSquares(frame_threshold, squares, boundRects, &od4);
-
                   // checks position and location of cars
+                  // no theres no time to separate this function ok
                   detectCars(&od4, final_frame, foundCars, &prev_area, &prev_centerX, &prev_centerY,
                      &cars_in_queue, &car_leave_timeout_counter, &stop_line_arrived, &stop_line_arrived_trigger,
                      initial_car_positions, &left_car_is_12oclock_car);
@@ -364,156 +327,41 @@ int32_t main(int32_t argc, char **argv) {
    return retCode;
 }
 
-/**
- * Helper function to find a cosine of angle between vectors
- * from pt0->pt1 and pt0->pt2
- */
-static double angle(cv::Point pt1, cv::Point pt2, cv::Point pt0) {
-   double dx1 = pt1.x - pt0.x;
-   double dy1 = pt1.y - pt0.y;
-   double dx2 = pt2.x - pt0.x;
-   double dy2 = pt2.y - pt0.y;
-   return (dx1*dx2 + dy1*dy2)/sqrt((dx1*dx1 + dy1*dy1)*(dx2*dx2 + dy2*dy2) + 1e-10);
-}
-
-// returns sequence of squares detected on the image.
-static void findSquares( const Mat& image, vector<vector<Point> >& squares ) {
-   int thresh = 50, N = 11;
-   squares.clear();
-
-   Mat pyr, timg, gray0(image.size(), CV_8U), gray;
-
-   // down-scale and upscale the image to filter out the noise
-   // blur works too.
-   pyrDown(image, pyr, Size(image.cols/2, image.rows/2));
-   pyrUp(pyr, timg, image.size());
-   vector<vector<Point> > contours;
-
-   // find squares in every color plane of the image
-   for( int c = 0; c < 1; c++ ) {
-      int ch[] = {c, 0};
-      mixChannels(&timg, 1, &gray0, 1, ch, 1);
-
-      // try several threshold levels
-      for( int l = 0; l < N; l++ ) {
-         // hack: use Canny instead of zero threshold level.
-         // Canny helps to catch squares with gradient shading
-         if( l == 0 ) {
-             // apply Canny. Take the upper threshold from slider
-             // and set the lower to 0 (which forces edges merging)
-             Canny(gray0, gray, 0, thresh, 5);
-             // dilate canny output to remove potential
-             // holes between edge segments
-             dilate(gray, gray, Mat(), Point(-1,-1));
-         }
-         else {
-             // apply threshold if l!=0:
-             //     tgray(x,y) = gray(x,y) < (l+1)*255/N ? 255 : 0
-             // 255 is max saturation/value. N is just a threshold level.
-             gray = gray0 >= (l+1)*255/N;
-         }
-
-         // find contours and store them all as a list
-         findContours(gray, contours, RETR_LIST, CHAIN_APPROX_SIMPLE);
-
-         vector<Point> approx;
-
-         // test each contour
-         for( size_t i = 0; i < contours.size(); i++ ) {
-            // approximate contour with accuracy proportional
-            // to the contour perimeter
-            approxPolyDP(contours[i], approx, arcLength(contours[i], true)*0.02, true);
-
-            // square contours should have 4 vertices after approximation
-            // relatively large area (to filter out noisy contours)
-            // and be convex.
-            // Note: absolute value (fabs) of an area is used because
-            // area may be positive or negative - in accordance with the
-            // contour orientation
-
-            if( approx.size() == 4 && // if there are 4 sides...
-            fabs(contourArea(approx)) > 700 && // and the square is big enough...
-            fabs(contourArea(approx)) < 200000 &&
-            isContourConvex(approx) ) { // and square is convex...
-
-               double maxCosine = 0;
-               for( int j = 2; j < 5; j++ ) {
-                  // find the maximum cosine of the angle between joint edges
-                  double cosine = fabs(angle(approx[j%4], approx[j-2], approx[j-1]));
-                  maxCosine = MAX(maxCosine, cosine);
-               }
-
-               // if cosines of all angles are small
-               // (all angles are ~90 degree) then its a square/rectangle.
-               // push the vertices to resultant sequence(array)
-               if( maxCosine < 0.25 ) {
-                  squares.push_back(approx);
-               }
-            }
-         }
-      }
-   }
-}
-
-// the function draws all the squares in the image
-static Mat drawSquares( Mat& image, const vector<vector<Point> >& squares, vector<Rect> &boundRects)
-{
-   Scalar color = Scalar(255,0,0 );
-
-   int group_thresh = 1;
-   double merge_box_diff = 0.6;
-
-   boundRects.resize(squares.size());
-// since the detected square may not always be straight, a bounding box around the...square ensures that its straight
-   for( size_t i = 0; i < squares.size(); i++ ) {
-      // Code from http://answers.opencv.org/question/72237/measuring-width-height-of-bounding-box/
-      boundRects[i] = boundingRect(squares[i]);
-      rectangle(image, boundRects[i].tl(), boundRects[i].br(), color, 2 );
-   }
-   groupRectangles(boundRects, group_thresh, merge_box_diff);  //group overlapping rectangles into 1
-   // cout << "rectangles grouped/merged." << endl;
-   return image;
-}
-
 void findCars(Mat &frame, vector<Rect>& foundCars, CascadeClassifier carsCascadeClassifier) {
 
    Mat frame_gray;
+   // the amount of overlapping squares on 1 place to confirm it is a car
    int min_neighbors = 3;
-   // int group_thresh = 1;
-   // double merge_box_diff = 0.8;
 
    cvtColor(frame, frame_gray, COLOR_RGB2GRAY );
    equalizeHist(frame_gray, frame_gray);
    carsCascadeClassifier.detectMultiScale(frame_gray, foundCars, 1.1, min_neighbors);
 
-   // cout << "Found cars: " << foundCars.size() << endl;
-   // groupRectangles(foundCars, group_thresh, merge_box_diff);
-   // cout << "Found merged cars: " << foundCars.size() << endl;
 }
 
 void countCars(Mat frame, vector<Point> &initial_car_positions, int *cars_in_queue, bool *stop_line_arrived) {
    int car_num = 0;
-   if (initial_car_positions[0] != Point(0,0)) {
+   if (initial_car_positions[0] != Point(0,0)) { // if theres a car on the left..
       car_num += 1;
       cout << endl << " <<<< ";
    }
-   if (initial_car_positions[1] != Point(0,0)) {
+   if (initial_car_positions[1] != Point(0,0)) { // if theres a car in the middle..
       car_num += 1;
       cout  << " |||| ";
    }
-   if (initial_car_positions[2] != Point(0,0)) {
+   if (initial_car_positions[2] != Point(0,0)) { // if theres a car on the right..
       car_num += 1;
       cout << " >>>> " << endl;
    }
    std::string car_count = std::to_string(car_num);
-   std::string max_car_count = std::to_string(*cars_in_queue);
+
 
    if (*stop_line_arrived == false) {
       if (*cars_in_queue < car_num) {
          *cars_in_queue = car_num; // remember the maximum amount of cars seen
       }
    }
-
+   std::string max_car_count = std::to_string(*cars_in_queue);
 
    cout << "  [<    CARS IN QUEUE : " << max_car_count << "  >]" ;
    if (car_num == 0) {
@@ -561,7 +409,7 @@ void detectCars(
 
       countCars(image, initial_car_positions, cars_in_queue, stop_line_arrived);
 
-      *prev_area = rect_area; // remember this frame's area for the next frame
+      *prev_area = rect_area; // remember this rect's area and position for the next frame
       *prev_centerX = rect_centerX;
       *prev_centerY = rect_centerY;
    }
@@ -629,17 +477,14 @@ void checkCarPosition( OD4Session *od4,
    double centerY_diff = centerY - *prev_centerY;
 
    int frame_center = 320;
-   int left_offset;
+   int left_offset; // section of the frame
    int right_offset;
+
    // special section of the frame that overlaps both left and middle.
    // detects when 12 o clock goes to the left side.
    int stop_line_arrival_offset = 220;
 
-   // int front_car_boundaryX = 100;
-   // int front_car_boundaryY = 240;
-
-   // if (area > 50000) {  *stop_line_arrived = false;   }
-
+// different offsets are needed in different phases
    if (*stop_line_arrived == false) {
       left_offset = 270;
       right_offset = 50;
@@ -657,6 +502,7 @@ void checkCarPosition( OD4Session *od4,
       cout << " [ center X: " << centerX << " ] // " << " [ X diff: " << centerX_diff <<  " ] ";
       cout << " // [[center Y: " << centerY << " ]] // " << " [ Y diff: " << centerY_diff << " ] "<< endl;
 
+      // old code, used to know when we have arrived at the stop line without the need of a message.
       if (centerX < frame_center - stop_line_arrival_offset) {
          if (centerX_diff > -200 && centerX_diff < 0 && centerY_diff > 0) {
             if (*prev_centerX >= 30) {
@@ -667,12 +513,15 @@ void checkCarPosition( OD4Session *od4,
          }
       }
 
+      // if car on the left side of frame...
       if (centerX < frame_center - left_offset) {
-         if (*left_car_is_12oclock_car == false) {
-            if (initial_car_positions[0] == Point(0,0)) {
+         if (*left_car_is_12oclock_car == false) { // and we know we are not at the stop line...
+            if (initial_car_positions[0] == Point(0,0)) { // only add if there is no existing left car
                initial_car_positions[0] = Point((int) centerX, (int) centerY);
                cout << "   <<<< ADDED LEFT CAR: " << initial_car_positions[0] << endl;
             }
+            // the -200 check is to make sure it is the same car we are comparing.
+            // else if car is going towards lower left corner of the frame....
             else if (centerX_diff > -200 && centerX_diff < 0 && centerY_diff > 0) {
                cout << "Detected car on left side, probably car at 3 o clock going out of sight" << endl;
             }
@@ -684,7 +533,7 @@ void checkCarPosition( OD4Session *od4,
             initial_car_positions[1] = Point((int) centerX, (int) centerY);
             cout << "   |||| ADDED MIDDLE CAR: " << initial_car_positions[1] << endl;
          }
-         else if (centerX_diff < 0 && centerY_diff > 0) {
+         else if (centerX_diff < 0 && centerY_diff > 0) { // going towards bot left corner
             if (*left_car_is_12oclock_car == false) {
                cout << "Detected car on middle, probably car at 12 o clock." << endl;
             }
@@ -698,7 +547,7 @@ void checkCarPosition( OD4Session *od4,
                cout << "   >>>> ADDED RIGHT CAR: " << initial_car_positions[2] << endl;
             }
          }
-         else if (centerX_diff > 0 && centerY_diff > 0) {
+         else if (centerX_diff > 0 && centerY_diff > 0) { // towards bot right
             cout << "Detected car on right side, probably car at 3 o clock." << endl;
          }
       }
@@ -714,7 +563,7 @@ void checkCarPosition( OD4Session *od4,
          // car is on middle/left - camera too close to see left
          if (centerX >= frame_center - left_offset && centerX < frame_center + right_offset) {
 
-            if (centerX_diff > -30 && centerX_diff < 0 &&
+            if (centerX_diff > -30 && centerX_diff < 0 && // makes sure it is the same car we are comparing
                centerY_diff > 0 && centerY_diff < 40) { // moving closer and towards the left
                if (area > 10000) {                        // if car is getting bigger
                   cout << "   / Car leaving Intersection, towards our lane or 9 o clock. /" << endl;
@@ -730,7 +579,7 @@ void checkCarPosition( OD4Session *od4,
                      centerX_diff > -20 && centerX_diff < 10) {
                if (centerX > 210) {
                   cout << "   | Car leaving Intersection, towards 12 o clock. | " << endl;
-                  if (area < 15000) {            // if car is very far away
+                  if (area < 15000) {            // if car is very far away (enough)
                      cout << "    || Car has left intersection at 12 o clock. || " << endl;
                      removeCarFromQueue(initial_car_positions, cars_in_queue, car_leave_timeout_counter);
                   }
@@ -741,19 +590,19 @@ void checkCarPosition( OD4Session *od4,
             else if (centerX_diff > -200 && centerX_diff < -0.5 &&
                      centerY_diff > -5 && centerY_diff < 5 ) {
                cout << "   < Car leaving Intersection, towards 9 o clock. < " << endl;
-               if (centerX < 180 && centerY > 150 && centerY <= 240) {
+               if (centerX < 180 && centerY > 150 && centerY <= 240) { // if *relatively* at the edge of frame
                   cout << "   <<< Car has left Intersection, towards 9 o clock. <<< " << endl;
                   removeCarFromQueue(initial_car_positions, cars_in_queue, car_leave_timeout_counter);
                }
             }
          }
 
-
+         // Moving in a straight line, from left to right
          if (centerX > frame_center + right_offset) {
             if (centerX_diff > 0.5 && centerX_diff < 200 &&
                   centerY_diff > -5 && centerY_diff < 5) {
                cout << "    > Car leaving Intersection towards 3 o clock >" << endl;
-               if (centerX > 510) {
+               if (centerX > 510) { // if on the far right
                   cout << "   >> Car has left at 3 o clock >> " << endl;
                   removeCarFromQueue(initial_car_positions, cars_in_queue, car_leave_timeout_counter);
                }
@@ -764,96 +613,4 @@ void checkCarPosition( OD4Session *od4,
       break;
 
    }
-}
-
-// https://answers.opencv.org/question/75510/how-to-make-auto-adjustmentsbrightness-and-contrast-for-image-android-opencv-image-correction/
-void BrightnessAndContrastAuto(const cv::Mat &src, cv::Mat &dst, float clipHistPercent)
-{
-   // Tries to stretch/average out the range on a greyscale image. Might need tuning.
-   // works only on gray images and ARGB color space.
-
-    CV_Assert(clipHistPercent >= 0);
-    CV_Assert((src.type() == CV_8UC1) || (src.type() == CV_8UC3) || (src.type() == CV_8UC4));
-
-   // alpha (contrast) operates as color range amplifier, values from 0 - 3
-   // beta (brightness) operates as range shift, values from 0 - 100
-    int histSize = 256;
-    float alpha, beta;
-    double minGray = 0, maxGray = 0;
-
-    //to calculate grayscale histogram
-    cv::Mat gray;
-    if (src.type() == CV_8UC1) gray = src;
-    else if (src.type() == CV_8UC3) cvtColor(src, gray, COLOR_RGB2GRAY);
-    else if (src.type() == CV_8UC4) cvtColor(src, gray, COLOR_RGBA2GRAY);
-    if (clipHistPercent <= 0)
-    {
-        // keep full available range
-        // Finds the global minimum and maximum in an array.
-        cv::minMaxLoc(gray, &minGray, &maxGray);
-        // cout << "Min:  || " << minGray << "Max" << maxGray << "||" << endl;
-    }
-    else
-    {
-        cv::Mat hist; //the grayscale histogram
-
-        float range[] = { 0, 256 };
-        const float* histRange = { range };
-        bool uniform = true;
-        bool accumulate = false;
-        calcHist(&gray, 1, 0, cv::Mat (), hist, 1, &histSize, &histRange, uniform, accumulate);
-
-        // calculate cumulative distribution from the histogram
-        std::vector<float> accumulator(histSize);
-        accumulator[0] = hist.at<float>(0);
-        // cout << "accumulator [0]: " << accumulator[0] << endl;
-
-        for (int i = 1; i < histSize; i++)
-        {
-            accumulator[i] = accumulator[i - 1] + hist.at<float>(i);
-        }
-
-        // locate points that cuts at required value
-        float max = accumulator.back();
-        // cout << "accumulator max: " << max << endl;
-
-        clipHistPercent *= (max / 100.0f); //make percent as absolute
-        // cout << "clipHistPercent % : " << clipHistPercent << endl;
-
-        clipHistPercent /= 1.25f; // left and right wings
-        // cout << "clipHistPercent L/R wings : " << clipHistPercent << endl;
-
-        // locate left cut
-        minGray = 0;
-        while (accumulator[(long)minGray] < clipHistPercent) {
-           minGray++;
-        }
-
-        // locate right cut
-        maxGray = histSize - 1;
-        while (accumulator[(long)maxGray] >= (max - clipHistPercent)) {
-           maxGray--;
-        }
-    }
-    // cout << "Min:  " << minGray << "  ||  Max" << maxGray << "   || " << endl;
-    // current range - inputrange is always 255.
-    // maxgray is always 255. min gray is always 0.
-    float inputRange = (float)maxGray - (float)minGray;
-    // cout << "Input range: " << inputRange << endl;
-    alpha = (histSize - 1) / inputRange;   // alpha expands current range to histsize range
-    beta = (float)-minGray * (float)alpha; // beta shifts current range so that minGray will go to 0
-    cout << " Added Contrast: " << alpha << "   || " << " Added Brightness: " << beta << endl;
-
-    // does the actual brightening.
-    // Apply brightness and contrast normalization
-    // convertTo operates with saturate_cast
-    src.convertTo(dst, -1, alpha, beta);
-
-    // restore alpha channel from source / merges the frame back together from gray
-    if (dst.type() == CV_8UC4)
-    {
-        int from_to[] = { 3, 3};
-        cv::mixChannels(&src, 4, &dst,1, from_to, 1);
-    }
-    return;
 }
