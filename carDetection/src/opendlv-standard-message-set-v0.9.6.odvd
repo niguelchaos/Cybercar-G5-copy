@@ -376,10 +376,6 @@ message opendlv.logic.cognition.GroundSpeedLimit [id = 1192] {
   float speedLimit [id = 1];
 }
 
-message StopSignPresenceUpdate[id = 2007]{
-   bool stopSignPresence [id = 1];
-}
-
 
 message Helloworld [id = 2000] {
    string helloworld [id = 1];
@@ -408,4 +404,22 @@ message SteeringCorrectionRequest [id = 2005] {
 
 message SpeedCorrectionRequest [id = 2006] {
    float amount [id = 1];
+}
+
+message SafeToGo [id = 2007] {
+}
+
+message StopSignPresenceUpdate[id = 2010]{
+   bool stopSignPresence [id = 1];
+}
+
+message CarOutOfSight[id = 2011]{
+}
+
+
+message ArrivedAtStopLine [id = 2012] {
+
+}
+message TimeToYeetOutOfIntersection [id = 2013] {
+
 }
