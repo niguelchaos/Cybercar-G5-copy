@@ -5,8 +5,7 @@ This repository contains a copy of the source code for navigating a Kiwi car thr
 
 ### Project Goals
 The general task of the project was to handle an intersection as a self driving vehicle, from beginning to end.
-1. Drive up to an intersection, without crashing into other cars. 
-..*. If there is a leading car, maintain safe distance.
+1. Drive up to an intersection, without crashing into other cars. If there is a leading car, maintain safe distance.
 3. Stop the car when the car reaches a stop sign.
 4. Follow the directional signs - if right of left turns are not allowed, the car will refuse to go in that direction.
 5. Determine when to leave - let other cars pass first.
